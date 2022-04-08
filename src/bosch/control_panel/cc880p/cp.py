@@ -4,8 +4,8 @@ from typing import Dict, List, Optional, Tuple, Union
 from asyncio import AbstractEventLoop
 from aioretry import RetryInfo, retry
 
-from control_pannel.models import Area, AreaListener, ArmingMode, Id, Output, SirenListener, Zone, ZoneListener
-from utils.bytes_to_str import to_hex
+from bosch.control_panel.cc880p.models import Area, AreaListener, ArmingMode, Id, Output, SirenListener, Zone, ZoneListener
+from bosch.utils.bytes_to_str import to_hex
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -291,6 +291,7 @@ class ControlPanel:
             _LOGGER.warning("Message not received. Reason: %s", ex)
         except ConnectionResetError:
             _LOGGER.warning("Connection reset by peer")
+            await self._open_connection()
         except Exception as ex:
             _LOGGER.warning("Unexpected Error: %s", ex)
 
