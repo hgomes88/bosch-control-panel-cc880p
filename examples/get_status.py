@@ -4,7 +4,7 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
-from control_pannel.control_panel import ControlPanel
+from bosch.control_panel.cc880p.cp import ControlPanel
 
 _LOGGER = logging.getLogger(__name__)
 
