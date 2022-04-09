@@ -102,7 +102,6 @@
 - [ ] Implement a commandline interface
 - [ ] Gracefully shutdown when a signal is received (e.g. A keyboard Interrupt)
 
-
 See the [open issues](https://github.com/hgomes88/bosch-control-panel-cc880p/issues) for a full list of proposed features (and known issues).
 
 <p align="right">(<a href="#top">back to top</a>)</p>
