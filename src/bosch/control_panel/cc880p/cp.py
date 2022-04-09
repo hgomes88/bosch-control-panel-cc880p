@@ -17,16 +17,39 @@ class ControlPanel:
         self,
         ip: str,
         port: str,
-        loop: Optional[AbstractEventLoop] = None,
-        number_of_zones: Optional[int] = 16,
+        loop: AbstractEventLoop = asyncio.get_event_loop(),
+        number_of_zones: int = 16,
         # number_of_areas: int = 4,
         number_of_areas: int = 1,
         # number_of_outputs: int = 6
-        number_of_outputs: int = 1
-    ) -> None:
+        number_of_outputs: int = 1,
+        get_status_period_s: float = 2.0
+
+    ):
+        """Initialize the Control Panel object to interface through TCP
+
+        Args:
+            ip (str):
+                IP of the control panel
+            port (str):
+                Port of the control panel
+            loop (AbstractEventLoop, optional):
+                Event Loop. Defaults to asyncio.get_event_loop().
+            number_of_zones (int, optional):
+                Number of zones being used. Defaults to 16.
+            number_of_areas (int, optional):
+                Number of areas being used. Defaults to 1.
+            number_of_outputs (int, optional):
+                Number of outputs being used. Defaults to 1.
+            get_status_period_s (float, optional):
+                Period (in seconds) in which the retrival of the alarm status
+                should be performed. Defaults to 2.0.
+        """
 
         # Main event loop
-        self._loop = loop or asyncio.get_event_loop()
+        self._loop = loop
+
+        self._get_status_period = get_status_period_s
 
         # IP of the control panel
         self._ip = ip
@@ -50,9 +73,9 @@ class ControlPanel:
         self._siren = False
 
         # Streamreader
-        self._reader: asyncio.StreamReader
+        self._reader: Optional[asyncio.StreamReader] = None
         # Streamwriter
-        self._writer: asyncio.StreamWriter
+        self._writer: Optional[asyncio.StreamWriter] = None
 
         # Keep track of periodic tasks that need to be stopped if the
         # service is stopped
@@ -188,6 +211,9 @@ class ControlPanel:
         """Opens the stream connection to the alarm
         """
 
+        if self._writer:
+            self._writer.close()
+
         self._reader, self._writer = await asyncio.open_connection(self._ip, self._port)
 
     def _create_zones(self):
@@ -292,7 +318,7 @@ class ControlPanel:
         except ConnectionResetError:
             _LOGGER.warning("Connection reset by peer")
             await self._open_connection()
-        except Exception as ex:
+        except BaseException as ex:
             _LOGGER.warning("Unexpected Error: %s", ex)
 
         return resp
@@ -302,7 +328,7 @@ class ControlPanel:
             _LOGGER.debug("Getting Status")
             async with self._lock:
                 await self.get_status_cmd()
-            await asyncio.sleep(2)
+            await asyncio.sleep(self._get_status_period)
 
     async def get_status_cmd(self):
         """Command to request the status of the alarm
