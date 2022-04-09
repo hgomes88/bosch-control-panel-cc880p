@@ -102,7 +102,7 @@ class ControlPanel:
         """Establish the connection to the control panel
         """
 
-        # Open the connection to the control pannel
+        # Open the connection to the control panel
         await self._open_connection()
         # Create the task that requests the status periodically
         self._tasks.append(self._loop.create_task(self._get_status_task()))
@@ -406,7 +406,7 @@ class ControlPanel:
             away_status = bool(data & (1 << away_bit))
             stay_status = bool(data & (1 << stay_bit))
             area = self._areas[i + 1]
-            status_chanded = False
+            status_changed = False
 
             if away_status and stay_status:
                 _LOGGER.error(
@@ -416,16 +416,16 @@ class ControlPanel:
             elif not away_status and not stay_status:
                 if area.mode is not ArmingMode.DISARMED:
                     area.mode = ArmingMode.DISARMED
-                    status_chanded = True
+                    status_changed = True
             elif away_status and area.mode is not ArmingMode.ARMED_AWAY:
                 if area.mode is not ArmingMode.ARMED_AWAY:
-                    status_chanded = True
+                    status_changed = True
                     area.mode = ArmingMode.ARMED_AWAY
             elif stay_status and area.mode is not ArmingMode.ARMED_STAY:
                 if area.mode is not ArmingMode.ARMED_STAY:
-                    status_chanded = True
+                    status_changed = True
                     area.mode = ArmingMode.ARMED_STAY
-            if status_chanded:
+            if status_changed:
                 if area.number in self._area_listeners:
                     for listener in self._area_listeners[area.number]:
                         if listener:
