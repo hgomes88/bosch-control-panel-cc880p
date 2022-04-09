@@ -13,8 +13,8 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/othneildrew/Best-README-Template">
-    <img src="images/cc880p.png" alt="Logo" width="" height="">
+  <a href="https://github.com/hgomes88/bosch-control-panel-cc880p">
+    <img src="images/cc880p.png" alt="CC880P" width="" height="">
   </a>
 
   <h3 align="center">Bosch Control Panel CC880P</h3>
@@ -102,8 +102,7 @@
 - [ ] Implement a commandline interface
 - [ ] Gracefully shutdown when a signal is received (e.g. A keyboard Interrupt)
 
-
-See the [open issues](https://github.com/othneildrew/Best-README-Template/issues) for a full list of proposed features (and known issues).
+See the [open issues](https://github.com/hgomes88/bosch-control-panel-cc880p/issues) for a full list of proposed features (and known issues).
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
