@@ -4,13 +4,14 @@ from typing import Callable
 
 Id = int
 
+
 @dataclass
 class Zone:
     """ Dataclass to store the zones of the alarm
     """
 
     number: Id
-    name: str = ""
+    name: str = ''
     triggered = False
 
 
@@ -20,7 +21,7 @@ class Output:
     """
 
     number: Id
-    name: str = ""
+    name: str = ''
     on = False
 
 
@@ -39,7 +40,7 @@ class Area:
     """
 
     number: Id
-    name: str = ""
+    name: str = ''
     mode: ArmingMode = ArmingMode.DISARMED
 
 

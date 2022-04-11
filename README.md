@@ -96,22 +96,28 @@ As mentioned in the website, it is possible to completely replace the [direct li
 
 #### Wiring
 
-To sniff and decode the packets supported by the control panel, it was followed the wiring as in the following diagram:  
-![a-link-plus-usb-diagram]  
-The information about A-Link Plus can be found [here][a-link-plus-sw].  
+To sniff and decode the packets supported by the control panel, it was followed the wiring as in the following diagram:
+
+![a-link-plus-usb-diagram]
+
+The information about A-Link Plus can be found [here][a-link-plus-sw].
 The USB-TTL converter can be a device similar to [this][usb-ttl-dev].
 
-To make the alarm remotely accessible, it was used a TCP/IP to UART bridge.  
-The current and tested solution was wired as following:  
-![esp8266-diagram]  
-The library `bosch-control-panel-cc880p` is part of this repository.  
-The `ESP8266` represents any device using that chip such as [ESP1][esp1-dev].  
-Note that it should be flashed with a software like [ESP-Link][esp-link-sw] to create a bridge between TCP/IP and UART.  
+To make the alarm remotely accessible, it was used a TCP/IP to UART bridge.
+The current and tested solution was wired as following:
+
+![esp8266-diagram]
+
+The library `bosch-control-panel-cc880p` is part of this repository.
+The `ESP8266` represents any device using that chip such as [ESP1][esp1-dev].
+Note that it should be flashed with a software like [ESP-Link][esp-link-sw] to create a bridge between TCP/IP and UART.
 Since `ESP1` operates at `3.3V` and `CC880P` control panel operates at `5V`, there's the need to use a level shifter, or something similar (see [this][level-shifter-website] site for examples).
 
 
-A better solution would be wiring the system as the diagram below:  
-![elfin-ew10-diagram]  
+A better solution would be wiring the system as the diagram below:
+
+![elfin-ew10-diagram]
+
 Using a device like [Elfin-EW10][elfin-ew10-dev] would prevent the usage of level shifter as it also operates at `5V`, as well as remove the need to flash any firmware as the device already provides everything needed.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
@@ -120,8 +126,8 @@ Using a device like [Elfin-EW10][elfin-ew10-dev] would prevent the usage of leve
 ##### UART Pinout and Configuration
 
 The pinout of the `CC880P` control panel is:
-- `TX`: Auxiliary Module `Pin3` (***Note:*** The website describes the `Pin7` by mistake)
-- `RX`: Auxiliary Module `Pin7` (***Note:*** The website describes the `Pin3` by mistake)
+- `TX`: Auxiliary Module `Pin3` (***Note:*** The [website][yes-thomas] describes the `Pin7` by mistake)
+- `RX`: Auxiliary Module `Pin7` (***Note:*** The [website][yes-thomas] describes the `Pin3` by mistake)
 - `GND`: Auxiliary Module `Pin4`
 - `VCC(5V)`: Auxiliary Module `Pin6`
 
@@ -184,7 +190,7 @@ Byte    Identifier  Comments
 10      nKeys       Number of keys being sent in this command
 11      crc         Frame checksum
                         Note: The checksum is not recognized so far, and thus
-                        it should be manually set 
+                        it should be manually set
 ```
 ###### Get Status Command
 
@@ -275,7 +281,7 @@ Byte   Identifier   Comments
   - [X] Block diagram of the involved hardware
   - [X] Table of the packets (commands and responses)
   - [ ] Other
-- [ ] Configure precommit and linter
+- [X] Configure precommit and linter
 - [ ] Implement the battery of unit/integration tests
 - [ ] Implement a commandline interface
 - [ ] Gracefully shutdown when a signal is received (e.g. A keyboard Interrupt)
@@ -288,7 +294,44 @@ See the [open issues](https://github.com/hgomes88/bosch-control-panel-cc880p/iss
 <!-- CONTRIBUTING -->
 ## Contributing
 
-<font color="yellow"> TODO </font>
+To contribute to this project, you need to execute the following steps:
+
+1. Install
+    1. Create a virtual environment (see how to [here][venv-website]):
+
+    2. Activate the virtual environment (see how to [here][venv-website]):
+
+    3. Install all the requirements for development:
+
+        `pip install -e ".[dev]"`
+
+    4. Install pre-commit:
+
+        `pre-commit install`
+
+2. Create new feature and commit the changes
+
+    1. Create a new feature branch based from the main branch:
+
+        `git checkout -b feature/<feature_name>`
+
+    2. Implement the changes for the feature
+
+    3. Run formatters/linters:
+
+        1. Autopep8:
+
+            `autopep8 src/ tests/`
+
+        1. Flake8:
+
+            `flake8 src/ tests/`
+
+        1. Mypy:
+
+            `mypy src/ tests/`
+
+    4. Commit the changes (this should run pre-commit to format/lint anyway)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -342,6 +385,8 @@ Pipy Releases: [https://pypi.org/project/bosch-control-panel-cc880p](https://pyp
 
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/hugohomes
+
+[venv-website]: https://docs.python.org/3/library/venv.html
 
 [yes-thomas]: https://yesthomas.com/Electronics/201607%20Bosch%20Alarm%20panel%20programming%20without%20Direct%20Link%20cable.html
 [a-link-plus-sw]: https://boschsecurityaustralia.freshdesk.com/support/solutions/articles/35000134094-a-link-plus-downloads-
