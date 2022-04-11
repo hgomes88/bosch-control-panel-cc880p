@@ -47,7 +47,7 @@ class ControlPanel:
             port (str):
                 Port of the control panel
             loop (AbstractEventLoop, optional):
-                Event Loop. Defaults to asyncio.get_event_loop().
+                Event Loop. Defaults None.
             number_of_zones (int, optional):
                 Number of zones being used. Defaults to 16.
             number_of_areas (int, optional):
