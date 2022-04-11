@@ -2,6 +2,7 @@
 
 
 <!-- PROJECT SHIELDS -->
+[![Build][build-shield]][build-url]
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
@@ -367,6 +368,9 @@ Pipy Releases: [https://pypi.org/project/bosch-control-panel-cc880p](https://pyp
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- MARKDOWN LINKS & IMAGES -->
+
+[build-shield]: https://img.shields.io/github/workflow/status/hgomes88/bosch-control-panel-cc880p/Test/main?style=for-the-badge
+[build-url]: https://github.com/hgomes88/bosch-control-panel-cc880p/actions/workflows/on-push.yml
 
 [contributors-shield]: https://img.shields.io/github/contributors/hgomes88/bosch-control-panel-cc880p.svg?style=for-the-badge
 [contributors-url]: https://github.com/hgomes88/bosch-control-panel-cc880p/graphs/contributors
