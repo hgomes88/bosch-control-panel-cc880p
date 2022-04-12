@@ -224,31 +224,41 @@ Response of [`Get Status Command`](#get-status-command). This frame contains all
 ```
 'Get Status' Response
 
-04 34 <out> <zone> <zone> XX XX XX XX <area> <siren>
+04 <out> <out> <zone> <zone> <en> <en> XX XX <area> <siren>
 
 Byte   Identifier   Comments
 ----------------------------
-1-2     04 34   :   Hexadecimal representation of the 'Get Status' response
-3       out     :   Each bit set indicates whether an output is on.
-                        Maximum number of outputs is 6.
-                        Bits 1-6 correspond to the outputs 1-6 of the
+1       04      :   Hexadecimal representation of the 'Get Status' response
+2-3     out     :   Each bit set indicates whether an output is on.
+                        Maximum number of outputs is 14.
+                        Bits 1-8 of byte 3 correspond to the outputs 1-8 of the
                         control panel.
-                        Bits 7-8 are not used.
+                        Bits 1-6 of byte 2 correspond to the outputs 9-14 of the
+                        control panel.
+                        Bits 7-8 of byte 2 are not used.
 4-5     zone    :   Each bit set indicates whether a zone is triggered.
                         Maximum number of zones is 16.
                         Bits 1-8 of byte 4 correspond to the zones 1-8 of the
                         control panel.
                         Bits 1-8 of byte 5 correspond to the zones 9-16 of the
                         control panel.
-6-9     XX      :   Unknown and not used bytes.
+6-7     en      :   Each bit set indicates whether a zone is enabled (only
+                        applied when the mode of the alarm is set to `STAY`, as
+                        in this mode is possible to have only a subset of zones
+                        enabled).
+                        Bits 1-8 of byte 6 correspond to the zones 1-8 of the
+                        control panel.
+                        Bits 1-8 of byte 7 correspond to the zones 9-16 of the
+                        control panel.
+8-9     XX      :   Unknown and not used bytes.
 10      area    :   Indicates whether the stay status as well as the away
                         status of the control panel is enabled for each area.
                         Maximum number if areas is 4.
                         Bits 1-4 correspond to the away status of the areas 1-4
                         Bits 5-8 correspond to the stay status of the areas 5-8
 11      siren   :   Indicate the status of the siren.
-                    Bit 6 if set mean the siren is triggered.
-                    Other bits are not used and thus unknown.
+                        Bit 6 if set mean the siren is triggered.
+                        Other bits are not used and thus unknown.
 ```
 
 <p align="right">(<a href="#top">back to top</a>)</p>

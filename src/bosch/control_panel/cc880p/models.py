@@ -12,7 +12,8 @@ class Zone:
 
     number: Id
     name: str = ''
-    triggered = False
+    triggered: bool = False
+    enabled: bool = False
 
 
 @dataclass
@@ -22,7 +23,7 @@ class Output:
 
     number: Id
     name: str = ''
-    on = False
+    on: bool = False
 
 
 class ArmingMode(Enum):
@@ -36,7 +37,7 @@ class ArmingMode(Enum):
 
 @dataclass
 class Area:
-    """Dataclass representig the alarm area
+    """Dataclass representing the alarm area
     """
 
     number: Id
@@ -47,3 +48,4 @@ class Area:
 ZoneListener = Callable[[Zone], bool]
 AreaListener = Callable[[Area], bool]
 SirenListener = Callable[[bool], bool]
+DataListener = Callable[[bytes], bool]
