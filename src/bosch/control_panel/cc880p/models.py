@@ -1,33 +1,43 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import Callable
+from typing import Dict
 
 Id = int
 
 
 @dataclass
-class Zone:
+class ControlPanelModel:
+    pass
+
+
+@dataclass
+class Siren(ControlPanelModel):
+    """ Dataclass to store the Siren of the alarm
+    """
+
+    on: bool = False
+
+
+@dataclass
+class Zone(ControlPanelModel):
     """ Dataclass to store the zones of the alarm
     """
 
-    number: Id
-    name: str = ''
     triggered: bool = False
     enabled: bool = False
 
 
 @dataclass
-class Output:
+class Output(ControlPanelModel):
     """Dataclass to store the varios alarm output states
     """
 
-    number: Id
-    name: str = ''
     on: bool = False
 
 
 class ArmingMode(Enum):
-    """Enumarator with all the alarm states
+    """Enumerator with all the alarm states
     """
 
     DISARMED = 0
@@ -36,16 +46,22 @@ class ArmingMode(Enum):
 
 
 @dataclass
-class Area:
+class Area(ControlPanelModel):
     """Dataclass representing the alarm area
     """
 
-    number: Id
-    name: str = ''
     mode: ArmingMode = ArmingMode.DISARMED
 
 
-ZoneListener = Callable[[Zone], bool]
-AreaListener = Callable[[Area], bool]
-SirenListener = Callable[[bool], bool]
+@dataclass
+class ControlPanel(ControlPanelModel):
+    """Dataclass representing the control panel object
+    """
+    siren: Siren
+    areas: Dict[Id, Area]
+    zones: Dict[Id, Zone]
+    outputs: Dict[Id, Output]
+
+
+ControlPanelListener = Callable[[Id, ControlPanelModel], bool]
 DataListener = Callable[[bytes], bool]
