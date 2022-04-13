@@ -1,8 +1,7 @@
 import asyncio
-import json
+import dataclasses
 import logging
 from asyncio import AbstractEventLoop
-from dataclasses import asdict
 from enum import Enum
 from typing import Dict
 from typing import List
@@ -13,20 +12,20 @@ from typing import Union
 from aioretry import retry
 from aioretry import RetryInfo
 from bosch.control_panel.cc880p.models import Area
-from bosch.control_panel.cc880p.models import AreaListener
 from bosch.control_panel.cc880p.models import ArmingMode
+from bosch.control_panel.cc880p.models import ControlPanel
+from bosch.control_panel.cc880p.models import ControlPanelListener
 from bosch.control_panel.cc880p.models import DataListener
 from bosch.control_panel.cc880p.models import Id
 from bosch.control_panel.cc880p.models import Output
-from bosch.control_panel.cc880p.models import SirenListener
+from bosch.control_panel.cc880p.models import Siren
 from bosch.control_panel.cc880p.models import Zone
-from bosch.control_panel.cc880p.models import ZoneListener
 from bosch.utils.bytes_to_str import to_hex
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class ControlPanel:
+class CP():
     """Class representing the alarm object
     """
 
@@ -79,15 +78,6 @@ class ControlPanel:
         # Number of outputs available in the alarm
         self._number_of_outputs = number_of_outputs
 
-        # Dictionary of all the zones
-        self._zones: Dict[Id, Zone] = {}
-        # Dictionary of all the areas
-        self._areas: Dict[Id, Area] = {}
-        # Dictionary of all the outputs
-        self._outputs: Dict[Id, Output] = {}
-        # State of the control panel siren
-        self._siren = False
-
         # Streamreader
         self._reader: Optional[asyncio.StreamReader] = None
         # Streamwriter
@@ -99,65 +89,37 @@ class ControlPanel:
         # Lock
         self._lock = asyncio.Lock()
 
-        # Listeners to be called whenever a zone state is changed
-        self._zone_listeners: Dict[Id, List[ZoneListener]] = {}
-        # Listeners to be called whenever an area state is changed
-        self._area_listeners: Dict[Id, List[AreaListener]] = {}
-        # Listeners to be called whenever the siren state is changed
-        self._siren_listeners: List[SirenListener] = []
+        # Listeners to be called whenever the control panel state is changed
+        self._control_panel_listeners: List[ControlPanelListener] = []
         # Listeners to be called whenever the there's new data
         self._data_listeners: List[DataListener] = []
 
-        # Create and initialize the outputs
-        self._create_outputs()
-        # Create and initialize the areas
-        self._create_areas()
-        # Create and initialize th zones
-        self._create_zones()
+        self._control_panel = ControlPanel(
+            # Create and initialize the siren
+            siren=self._create_siren(),
+            # Create and initialize the outputs
+            outputs=self._create_outputs(),
+            # Create and initialize the areas
+            areas=self._create_areas(),
+            # Create and initialize th zones
+            zones=self._create_zones()
+        )
+
+    def __repr__(self):
+        return str(self._control_panel)
 
     @property
     def __dict__(self):
-
-        areas: Dict[Id, Dict] = dict()
-        zones: Dict[Id, Dict] = dict()
-        outs: Dict[Id, Dict] = dict()
-
-        for id, area in self.areas.items():
-            area_dict = asdict(area, dict_factory=self._custom_asdict_factory)
-            area_dict.pop('number')
-            if not area_dict['name']:
-                area_dict.pop('name')
-            areas[id] = area_dict
-
-        for id, zone in self.zones.items():
-            zone_dict = asdict(zone, dict_factory=self._custom_asdict_factory)
-            zone_dict.pop('number')
-            if not zone_dict['name']:
-                zone_dict.pop('name')
-            zones[id] = zone_dict
-
-        for id, out in self._outputs.items():
-            out_dict = asdict(out, dict_factory=self._custom_asdict_factory)
-            out_dict.pop('number')
-            if not out_dict['name']:
-                out_dict.pop('name')
-            outs[id] = out_dict
-
-        return dict(
-            siren=self.siren,
-            areas=areas,
-            zones=zones,
-            outputs=outs
+        return dataclasses.asdict(
+            self._control_panel,
+            dict_factory=self._custom_asdict_factory
         )
-
-    def __str__(self) -> str:
-        return json.dumps(self.__dict__, indent=1)
 
     @classmethod
     def _custom_asdict_factory(cls, data):
         def convert_value(obj):
             if isinstance(obj, Enum):
-                return obj.value
+                return obj.name
             return obj
 
         return {k: convert_value(v) for k, v in data}
@@ -183,29 +145,11 @@ class ControlPanel:
 
         return True
 
-    def add_zone_listener(self, zone_number: int, listener: ZoneListener):
-        """Add a listener function to listen for zone state changes
+    def add_control_panel_listener(self, listener: ControlPanelListener):
+        """Add a listener function to listen for any change in the alarm
         """
 
-        if zone_number in set(self._zones.keys()):
-            if zone_number not in self._zone_listeners:
-                self._zone_listeners[zone_number] = []
-            self._zone_listeners[zone_number].append(listener)
-
-    def add_area_listener(self, area_number: int, listener: AreaListener):
-        """Add a listener function to listen for are state changes
-        """
-
-        if area_number in set(self._areas.keys()):
-            if area_number not in self._area_listeners:
-                self._area_listeners[area_number] = []
-            self._area_listeners[area_number].append(listener)
-
-    def add_siren_listener(self, listener: SirenListener):
-        """Add a listener function to listen for siren state changes
-        """
-
-        self._siren_listeners.append(listener)
+        self._control_panel_listeners.append(listener)
 
     def add_data_listener(self, listener: DataListener):
         """Add a listener function to listen for any incoming data
@@ -261,25 +205,11 @@ class ControlPanel:
                 await self.get_status_cmd()
 
     @property
-    def zones(self) -> Dict[Id, Zone]:
-        """Property that returns the list of zones available
+    def control_panel(self) -> ControlPanel:
+        """Property that returns the control panel object
         """
 
-        return self._zones
-
-    @property
-    def areas(self) -> Dict[Id, Area]:
-        """Property that return the list of areas supported by the alarm
-        """
-
-        return self._areas
-
-    @property
-    def siren(self) -> bool:
-        """Property that return the siren status
-        """
-
-        return self._siren
+        return self._control_panel
 
     async def _open_connection(self):
         """Opens the stream connection to the alarm
@@ -293,29 +223,29 @@ class ControlPanel:
             self._port
         )
 
-    def _create_zones(self):
-        """Create and initialize all the zone objects
+    def _create_siren(self) -> Siren:
+        """Create and initialize the siren object
         """
 
-        for i in range(self._number_of_zones):
-            zone = Zone(i + 1)
-            self._zones[zone.number] = zone
+        return Siren()
 
-    def _create_areas(self):
+    def _create_areas(self) -> Dict[Id, Area]:
         """Create and initialize all the area objects
         """
 
-        for i in range(self._number_of_areas):
-            area = Area(i + 1)
-            self._areas[area.number] = area
+        return {i + 1: Area() for i in range(self._number_of_areas)}
 
-    def _create_outputs(self):
+    def _create_zones(self) -> Dict[Id, Zone]:
+        """Create and initialize all the zone objects
+        """
+
+        return {i + 1: Zone() for i in range(self._number_of_zones)}
+
+    def _create_outputs(self) -> Dict[Id, Output]:
         """Create and initialize all the output objects
         """
 
-        for i in range(self._number_of_outputs):
-            output = Output(i + 1)
-            self._outputs[output.number] = output
+        return {i + 1: Output() for i in range(self._number_of_outputs)}
 
     @staticmethod
     def _retry_policy(info: RetryInfo) -> Tuple[bool, int]:
@@ -368,7 +298,7 @@ class ControlPanel:
 
         if self._reader and self._writer:
             # # Ensure a clean buffer
-            # self._reader._buffer.clear()
+            self._reader._buffer.clear()  # type: ignore
 
             # Send the command
             self._writer.write(message)
@@ -412,7 +342,10 @@ class ControlPanel:
         while True:
             _LOGGER.debug('Getting Status')
             async with self._lock:
-                await self.get_status_cmd()
+                try:
+                    await self.get_status_cmd()
+                except Exception as ex:
+                    _LOGGER.error(f'Error during getting the status {ex}')
             await asyncio.sleep(self._get_status_period)
 
     async def get_status_cmd(self):
@@ -437,7 +370,18 @@ class ControlPanel:
 
     @classmethod
     def _is_status_msg(cls, data: bytes):
-        return data[0] == 0x04
+        frame_size = 13
+
+        if data[0] != 0x04:
+            return False
+
+        if len(data) != frame_size:
+            raise ValueError(
+                f'The size of the frame should be {frame_size}'
+                f' but is {len(data)}'
+            )
+
+        return True
 
     def _handle_status_msg(self, data: bytes):
         self._update_siren_status(data[10])
@@ -451,25 +395,24 @@ class ControlPanel:
             bit = i % 8
             byte = int(i / 8)
             status = bool(data[byte] & (1 << bit))
-            zone = self._zones[i + 1]
+            zone_number: Id = i + 1
+            zone = self._control_panel.zones[zone_number]
 
             if zone.triggered != status:
                 zone.triggered = status
 
-                if zone.number in self._zone_listeners:
-                    for listener in self._zone_listeners[zone.number]:
-                        if listener:
-                            asyncio.create_task(listener(zone))
+                for listener in self._control_panel_listeners:
+                    asyncio.create_task(listener(zone_number, zone))
 
                 _LOGGER.info(
                     'Status of Zone %d changed to %d',
-                    zone.number,
+                    zone_number,
                     zone.triggered
                 )
 
     def update_zone_enabled(self, data: bytes):
 
-        area = list(self.areas.values())[0]
+        area = list(self._control_panel.areas.values())[0]
         if area.mode == ArmingMode.ARMED_AWAY:
             status = True
         elif area.mode == ArmingMode.DISARMED:
@@ -480,14 +423,15 @@ class ControlPanel:
             byte = int(i / 8)
             if area.mode == ArmingMode.ARMED_STAY:
                 status = bool(data[byte] & (1 << bit))
-            zone = self._zones[i + 1]
+            zone_number = i + 1
+            zone = self._control_panel.zones[zone_number]
 
             if zone.enabled != status:
                 zone.enabled = status
 
                 _LOGGER.info(
                     'Zone enabling of Zone %d changed to %d',
-                    zone.number,
+                    zone_number,
                     zone.enabled
                 )
 
@@ -495,25 +439,27 @@ class ControlPanel:
         bit = 6
         status = bool(data & (1 << bit))
 
-        if self._siren != status:
-            self._siren = status
+        if self._control_panel.siren.on != status:
+            self._control_panel.siren.on = status
 
-            for listener in self._siren_listeners:
-                if listener:
-                    asyncio.create_task(listener(status))
+            for listener in self._control_panel_listeners:
+                asyncio.create_task(
+                    listener(0, self._control_panel.siren)
+                )
 
-            _LOGGER.info('Status of Siren changed to %d', self._siren)
+            _LOGGER.info('Siren changed to %d', self._control_panel.siren)
 
     def _update_output_status(self, data: bytes):
         for i in range(self._number_of_outputs):
             bit = i % 8
             byte = len(data) - int(i / 8) - 1
             status = bool(data[byte] & (1 << bit))
-            out = self._outputs[i + 1]
+            id: Id = i + 1
+            out = self._control_panel.outputs[id]
 
             if out.on != status:
                 out.on = status
-                _LOGGER.info('The output %d changed to %d', out.number, out.on)
+                _LOGGER.info('The output %d changed to %d', id, out.on)
 
     def _update_area_status(self, data: int):
 
@@ -522,13 +468,14 @@ class ControlPanel:
             stay_bit = away_bit + 4
             away_status = bool(data & (1 << away_bit))
             stay_status = bool(data & (1 << stay_bit))
-            area = self._areas[i + 1]
+            area_number: Id = i + 1
+            area = self._control_panel.areas[area_number]
             status_changed = False
 
             if away_status and stay_status:
                 _LOGGER.error(
                     'Both away and stay arming status not possible. Area %d',
-                    area.number,
+                    area_number,
                 )
             elif not away_status and not stay_status:
                 if area.mode is not ArmingMode.DISARMED:
@@ -543,13 +490,13 @@ class ControlPanel:
                     status_changed = True
                     area.mode = ArmingMode.ARMED_STAY
             if status_changed:
-                if area.number in self._area_listeners:
-                    for listener in self._area_listeners[area.number]:
-                        if listener:
-                            asyncio.create_task(listener(area))
+
+                for listener in self._control_panel_listeners:
+                    asyncio.create_task(listener(area_number, area))
+
                 _LOGGER.info(
                     'Status of Area %d changed to %s',
-                    area.number,
+                    area_number,
                     area.mode)
 
     async def _get_crc(self, data: bytes):
