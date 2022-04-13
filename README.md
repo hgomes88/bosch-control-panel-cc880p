@@ -197,6 +197,69 @@ Byte    Identifier  Comments
                         Note: The checksum is not recognized so far, and thus
                         it should be manually set
 ```
+
+###### Set Siren Command
+
+Command used to enable/disable the siren
+
+```
+'Set Siren On ' Command
+0E 05 00 00 00 00 00 00 00 00 1C
+
+'Set Siren Off' Command
+0E 06 00 00 00 00 00 00 00 00 1D
+
+```
+
+###### Set Arm Command
+
+Command used to arm/disarm the alarm
+
+```
+'Arm' Command
+0E 01 00 00 00 00 00 00 00 00 17
+
+'Disarm' Command
+0E 02 00 00 00 00 00 00 00 00 18
+
+```
+
+###### Set Output Command
+
+Command used to set (enable/disable) outputs of the control panel.
+
+```
+'Set Output' Command
+
+0E <on> <out> 00 00 00 00 00 00 00 <crc>
+
+Byte    Identifier  Comments
+-------------------------------------------------------------------------------
+1       0E          Hexadecimal representation of special functions
+2       on          Special function to be executed:
+                        Set Output On: Set this byte to 03
+                        Set Output Off: Set this byte to 04
+3       out         This byte represents the index of the target output.
+                      Supports setting the outputs 1-5, which values in this
+                      byte are 0-4 respectively.
+                      Here is the list of commands for each single output:
+
+                            '1 On':   0E 03 00 00 00 00 00 00 00 00 1A
+                            '1 Off':  0E 04 00 00 00 00 00 00 00 00 1A
+                            '2 On':   0C 03 01 00 00 00 00 00 00 00 1A
+                            '2 Off':  0C 04 01 00 00 00 00 00 00 00 1A
+                            '3 On':   0C 03 02 00 00 00 00 00 00 00 1B
+                            '3 Off':  0C 04 02 00 00 00 00 00 00 00 1B
+                            '4 On':   0C 03 03 00 00 00 00 00 00 00 1D
+                            '4 Off':  0C 04 03 00 00 00 00 00 00 00 1D
+                            '5 On':   0C 03 04 00 00 00 00 00 00 00 1D
+                            '5 Off':  0C 04 04 00 00 00 00 00 00 00 1D
+4-10    XX          All those bytes should be settled to 00.
+11      crc         Frame checksum
+                        Note: The checksum is not recognized so far, and thus
+                        it should be manually set
+```
+
 ###### Get Status Command
 
 Command used to request the overall status of the control panel.

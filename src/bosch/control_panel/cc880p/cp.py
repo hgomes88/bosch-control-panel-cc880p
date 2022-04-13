@@ -204,6 +204,116 @@ class CP():
             if update:
                 await self.get_status_cmd()
 
+    @classmethod
+    def _supports_set_output(cls, id: Id):
+        if 0 < id <= 4:
+            return True
+        return False
+
+    @classmethod
+    def _get_output_bytes(cls, id: Id, on: bool = True) -> bytes:
+        """Gets the bytes that represents the command to enable/disable a
+        certain output
+
+            # 0e 03 00 00 00 00 00 00 00 00 1a 	Enable Output 1
+            # 0e 04 00 00 00 00 00 00 00 00 1a 	Disable Output 1
+            # 0e 03 01 00 00 00 00 00 00 00 1a 	Enable Output 2
+            # 0e 04 01 00 00 00 00 00 00 00 1a 	Disable Output 2
+            # 0e 03 02 00 00 00 00 00 00 00 1b 	Enable Output 3
+            # 0e 04 02 00 00 00 00 00 00 00 1b 	Disable Output 3
+            # 0e 03 03 00 00 00 00 00 00 00 1d 	Enable Output 4
+            # 0e 04 03 00 00 00 00 00 00 00 1d 	Disable Output 4
+            # 0e 03 04 00 00 00 00 00 00 00 1d 	Enable Output 5
+            # 0e 04 04 00 00 00 00 00 00 00 1d 	Disable Output 5
+
+        Args:
+            id (Id): Output Id
+            on (bool): whether is to enable the the output. Defaults to True.
+
+        Raises:
+            ValueError: If the output selected is not supported to be changed
+
+        Returns:
+            bytes: The bytes representation of the command
+        """
+
+        idx = id - 1
+        if id in [1, 2]:
+            if on:
+                ret = bytes([0x0e, 0x03, idx, 0x00, 0x00, 0x00,
+                            0x00, 0x00, 0x00, 0x00, 0x1a])
+            else:
+                ret = bytes([0x0e, 0x04, idx, 0x00, 0x00, 0x00,
+                            0x00, 0x00, 0x00, 0x00, 0x1a])
+        elif id == 3:
+            if on:
+                ret = bytes([0x0e, 0x03, idx, 0x00, 0x00, 0x00,
+                            0x00, 0x00, 0x00, 0x00, 0x1b])
+            else:
+                ret = bytes([0x0e, 0x04, idx, 0x00, 0x00, 0x00,
+                            0x00, 0x00, 0x00, 0x00, 0x1b])
+        elif id in [4, 5]:
+            if on:
+                ret = bytes([0x0e, 0x03, idx, 0x00, 0x00, 0x00,
+                            0x00, 0x00, 0x00, 0x00, 0x1d])
+            else:
+                ret = bytes([0x0e, 0x04, idx, 0x00, 0x00, 0x00,
+                            0x00, 0x00, 0x00, 0x00, 0x1d])
+        else:
+            raise ValueError(f'The output with the id {id} is not supported')
+
+        return ret
+
+    async def set_output(self, id: Id, on: bool):
+        try:
+            if id not in self.control_panel.outputs:
+                raise ValueError(f"The output with {id} doesn't exist")
+
+            if self._control_panel.outputs[id].on != on:
+                async with self._lock:
+                    await self._send_command(self._get_output_bytes(id, on))
+        except Exception as ex:
+            _LOGGER.error(f'Error setting the output: {ex}')
+
+    async def set_arming(self, id: Id = 1, arm: bool = False):
+        if arm and self._control_panel.areas[id].mode == ArmingMode.DISARMED:
+            # Arm
+            async with self._lock:
+                await self._send_command(
+                    bytes([
+                        0x0e, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                        0x00, 0x17
+                    ])
+                )
+        elif not arm and \
+                self._control_panel.areas[id].mode != ArmingMode.DISARMED:
+            # Disarm
+            async with self._lock:
+                await self._send_command(
+                    bytes([
+                        0x0e, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                        0x00, 0x18
+                    ])
+                )
+
+    async def set_siren(self, on: bool = False):
+        if on and self._control_panel.siren.on != on:
+            # Switch on the siren
+            async with self._lock:
+                await self._send_command(
+                    bytes([
+                        0x0e, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                        0x00, 0x1C
+                    ])
+                )
+        elif not on and self._control_panel.siren.on != on:
+            # Switch of the siren
+            async with self._lock:
+                await self._send_command(
+                    bytes([0x0e, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                           0x00, 0x00, 0x1D])
+                )
+
     @property
     def control_panel(self) -> ControlPanel:
         """Property that returns the control panel object
