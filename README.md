@@ -197,6 +197,69 @@ Byte    Identifier  Comments
                         Note: The checksum is not recognized so far, and thus
                         it should be manually set
 ```
+
+###### Set Siren Command
+
+Command used to enable/disable the siren
+
+```
+'Set Siren On ' Command
+0E 05 00 00 00 00 00 00 00 00 1C
+
+'Set Siren Off' Command
+0E 06 00 00 00 00 00 00 00 00 1D
+
+```
+
+###### Set Arm Command
+
+Command used to arm/disarm the alarm
+
+```
+'Arm' Command
+0E 01 00 00 00 00 00 00 00 00 17
+
+'Disarm' Command
+0E 02 00 00 00 00 00 00 00 00 18
+
+```
+
+###### Set Output Command
+
+Command used to set (enable/disable) outputs of the control panel.
+
+```
+'Set Output' Command
+
+0E <on> <out> 00 00 00 00 00 00 00 <crc>
+
+Byte    Identifier  Comments
+-------------------------------------------------------------------------------
+1       0E          Hexadecimal representation of special functions
+2       on          Special function to be executed:
+                        Set Output On: Set this byte to 03
+                        Set Output Off: Set this byte to 04
+3       out         This byte represents the index of the target output.
+                      Supports setting the outputs 1-5, which values in this
+                      byte are 0-4 respectively.
+                      Here is the list of commands for each single output:
+
+                            '1 On':   0E 03 00 00 00 00 00 00 00 00 1A
+                            '1 Off':  0E 04 00 00 00 00 00 00 00 00 1A
+                            '2 On':   0C 03 01 00 00 00 00 00 00 00 1A
+                            '2 Off':  0C 04 01 00 00 00 00 00 00 00 1A
+                            '3 On':   0C 03 02 00 00 00 00 00 00 00 1B
+                            '3 Off':  0C 04 02 00 00 00 00 00 00 00 1B
+                            '4 On':   0C 03 03 00 00 00 00 00 00 00 1D
+                            '4 Off':  0C 04 03 00 00 00 00 00 00 00 1D
+                            '5 On':   0C 03 04 00 00 00 00 00 00 00 1D
+                            '5 Off':  0C 04 04 00 00 00 00 00 00 00 1D
+4-10    XX          All those bytes should be settled to 00.
+11      crc         Frame checksum
+                        Note: The checksum is not recognized so far, and thus
+                        it should be manually set
+```
+
 ###### Get Status Command
 
 Command used to request the overall status of the control panel.
@@ -224,7 +287,7 @@ Response of [`Get Status Command`](#get-status-command). This frame contains all
 ```
 'Get Status' Response
 
-04 <out> <out> <zone> <zone> <en> <en> XX XX <area> <siren>
+04 <out> <out> <zone> <zone> <en> <en> XX XX <area> <s/h> <m>
 
 Byte   Identifier   Comments
 ----------------------------
@@ -256,8 +319,12 @@ Byte   Identifier   Comments
                         Maximum number if areas is 4.
                         Bits 1-4 correspond to the away status of the areas 1-4
                         Bits 5-8 correspond to the stay status of the areas 5-8
-11      siren   :   Indicate the status of the siren.
+11      s/h   :   Indicate the status of the siren (1 bit) + the current hours.
                         Bit 6 if set mean the siren is triggered.
+                        Bits 0-4 represents the hours (0h-23h)
+                        Other bits are not used and thus unknown.
+12      m   :   Indicate the current minutes.
+                        Bits 0-5 represents the minutes (0m-59m).
                         Other bits are not used and thus unknown.
 ```
 
@@ -267,15 +334,24 @@ Byte   Identifier   Comments
 <!-- GETTING STARTED -->
 ## Getting Started
 
-<font color="yellow"> TODO </font>
+This library provides a CLI (Command Line Interface) to interact with the
+control panel.
 
 ### Prerequisites
 
-<font color="yellow"> TODO </font>
-
 ### Installation
 
-<font color="yellow"> TODO </font>
+The installation of the library, including the CLI, is as simple as run:
+```
+$ pip install .
+```
+
+After that, the library is ready to be used, and now the CLI can be used.
+To get help how to use it type in the terminal the following:
+
+```
+$ control_panel -h
+```
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -283,7 +359,82 @@ Byte   Identifier   Comments
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-<font color="yellow"> TODO </font>
+After following the [`Installation`](#installation) section, now the usage of
+the CLI can be found by running:
+```
+$ control_panel -h
+usage: control_panel [-h] [-v] -c IP -p PORT {cmd} ...
+
+Connects to the Control Panel
+
+positional arguments:
+  {cmd}
+    cmd                 Execute a command
+
+options:
+  -h, --help            show this help message and exit
+  -v, --version         Gets the current version
+  -c IP, --connect IP   the host ip
+  -p PORT, --port PORT  the host port
+```
+
+There are 2 options to run the CLI as shown in the following sections.
+
+### Run in Listen Mode
+
+In this mode, the script will connect to the control panel in listening only mode, where it will output any kind of change on the control panel.
+
+To run it the minimum should be:
+
+```
+$ control_panel -c 192.168.1.22 -p 23
+```
+
+### Run in Commanding Mode
+
+This mode, allows the user to send commands to the control panel.
+To see the list of available commands the user can do:
+```
+$ control_panel -c <ip> -p <port> cmd -h
+usage: control_panel cmd [-h]  {sendKeys,setMode,setSiren,setOut} ...
+
+positional arguments:
+  cmd
+  {sendKeys,setMode,setSiren,setOut}
+    sendKeys            Sends a set of keys to the control panel. Currently supports the following: [0-9*#]{1,7}
+    setMode             Change the control panel mode like arm, disarm, etc
+    setSiren            Change the control panel siren status
+    setOut              Change the output status of the control panel
+
+options:
+  -h, --help            show this help message and exit
+```
+
+The following are some examples:
+
+```
+$ control_panel -c <ip> -p <port> cmd setSiren off
+Before: Siren(on=True)
+After: Siren(on=False)
+```
+
+```
+$ control_panel -c <ip> -p <port> cmd setSiren 1
+Before: Siren(on=False)
+After: Siren(on=True)
+```
+
+```
+$ control_panel -c <ip> -p <port> cmd setSiren 1
+Before: Siren(on=False)
+After: Siren(on=True)
+```
+
+```
+$ control_panel -c <ip> -p <port> cmd setOut 3 on
+Before: Output(on=False)
+After: Output(on=True)
+```
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -298,7 +449,7 @@ Byte   Identifier   Comments
   - [ ] Other
 - [X] Configure precommit and linter
 - [ ] Implement the battery of unit/integration tests
-- [ ] Implement a commandline interface
+- [X] Implement a commandline interface
 - [ ] Gracefully shutdown when a signal is received (e.g. A keyboard Interrupt)
 
 See the [open issues](https://github.com/hgomes88/bosch-control-panel-cc880p/issues) for a full list of proposed features (and known issues).
