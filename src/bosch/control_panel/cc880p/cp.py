@@ -19,6 +19,7 @@ from bosch.control_panel.cc880p.models import DataListener
 from bosch.control_panel.cc880p.models import Id
 from bosch.control_panel.cc880p.models import Output
 from bosch.control_panel.cc880p.models import Siren
+from bosch.control_panel.cc880p.models import Time
 from bosch.control_panel.cc880p.models import Zone
 from bosch.utils.bytes_to_str import to_hex
 
@@ -58,7 +59,8 @@ class CP():
                 Number of outputs being used. Defaults to 1.
             get_status_period_s (float, optional):
                 Period (in seconds) in which the retrival of the alarm status
-                should be performed. Defaults to 2.0.
+                should be performed. If set to 0 or None, then the status is
+                not automatically fetch. Defaults to 2.0.
         """
 
         # Main event loop
@@ -102,7 +104,9 @@ class CP():
             # Create and initialize the areas
             areas=self._create_areas(),
             # Create and initialize th zones
-            zones=self._create_zones()
+            zones=self._create_zones(),
+            # Create and initialize the time
+            time_utc=self._create_time(),
         )
 
     def __repr__(self):
@@ -131,7 +135,8 @@ class CP():
         # Open the connection to the control panel
         await self._open_connection()
         # Create the task that requests the status periodically
-        self._tasks.append(self._loop.create_task(self._get_status_task()))
+        if self._get_status_period:
+            self._tasks.append(self._loop.create_task(self._get_status_task()))
 
         return True
 
@@ -186,23 +191,22 @@ class CP():
         for i in range(0, len(new_keys), max_keys):
             cmds.append(new_keys[i: i + max_keys])
 
-        async with self._lock:
-            for cmd in cmds:
-                current_zone = bytes([1])
-                n_keys = bytes([len(cmd)])
-                _bytes = bytes.fromhex('0C00000000000000000000')
-                _bytes = (
-                    _bytes[0:1]
-                    + cmd
-                    + _bytes[1 + len(cmd): 8]
-                    + current_zone
-                    + n_keys
-                    + bytes([await self._get_crc(cmd)])
-                )
-                await self._send_command(_bytes)
+        for cmd in cmds:
+            current_zone = bytes([1])
+            n_keys = bytes([len(cmd)])
+            _bytes = bytes.fromhex('0C00000000000000000000')
+            _bytes = (
+                _bytes[0:1]
+                + cmd
+                + _bytes[1 + len(cmd): 8]
+                + current_zone
+                + n_keys
+                + bytes([await self._get_crc(cmd)])
+            )
+            await self._send_command(_bytes)
 
-            if update:
-                await self.get_status_cmd()
+        if update:
+            await self.get_status_cmd()
 
     @classmethod
     def _supports_set_output(cls, id: Id):
@@ -270,49 +274,46 @@ class CP():
                 raise ValueError(f"The output with {id} doesn't exist")
 
             if self._control_panel.outputs[id].on != on:
-                async with self._lock:
-                    await self._send_command(self._get_output_bytes(id, on))
+                await self._send_command(self._get_output_bytes(id, on))
         except Exception as ex:
             _LOGGER.error(f'Error setting the output: {ex}')
 
     async def set_arming(self, id: Id = 1, arm: bool = False):
         if arm and self._control_panel.areas[id].mode == ArmingMode.DISARMED:
             # Arm
-            async with self._lock:
-                await self._send_command(
-                    bytes([
-                        0x0e, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                        0x00, 0x17
-                    ])
-                )
+            await self._send_command(
+                bytes([
+                    0x0e, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x17
+                ])
+            )
         elif not arm and \
                 self._control_panel.areas[id].mode != ArmingMode.DISARMED:
             # Disarm
-            async with self._lock:
-                await self._send_command(
-                    bytes([
-                        0x0e, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                        0x00, 0x18
-                    ])
-                )
+            await self._send_command(
+                bytes([
+                    0x0e, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x18
+                ])
+            )
 
     async def set_siren(self, on: bool = False):
         if on and self._control_panel.siren.on != on:
             # Switch on the siren
-            async with self._lock:
-                await self._send_command(
-                    bytes([
-                        0x0e, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                        0x00, 0x1C
-                    ])
-                )
+            await self._send_command(
+                bytes([
+                    0x0e, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x1C
+                ])
+            )
         elif not on and self._control_panel.siren.on != on:
             # Switch of the siren
-            async with self._lock:
-                await self._send_command(
-                    bytes([0x0e, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                           0x00, 0x00, 0x1D])
-                )
+            await self._send_command(
+                bytes([
+                    0x0e, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x1D
+                ])
+            )
 
     @property
     def control_panel(self) -> ControlPanel:
@@ -356,6 +357,12 @@ class CP():
         """
 
         return {i + 1: Output() for i in range(self._number_of_outputs)}
+
+    def _create_time(self) -> Time:
+        """Create and initialize the siren object
+        """
+
+        return Time()
 
     @staticmethod
     def _retry_policy(info: RetryInfo) -> Tuple[bool, int]:
@@ -434,28 +441,28 @@ class CP():
 
         resp = None
 
-        try:
-            resp = await self._send(message)
-        except asyncio.exceptions.TimeoutError:
-            _LOGGER.warning('Message not received on time')
-        except asyncio.IncompleteReadError as ex:
-            _LOGGER.warning('Message not received. Reason: %s', ex)
-        except ConnectionResetError:
-            _LOGGER.warning('Connection reset by peer')
-            await self._open_connection()
-        except BaseException as ex:
-            _LOGGER.warning('Unexpected Error: %s', ex)
+        async with self._lock:
+            try:
+                resp = await self._send(message)
+            except asyncio.exceptions.TimeoutError:
+                _LOGGER.warning('Message not received on time')
+            except asyncio.IncompleteReadError as ex:
+                _LOGGER.warning('Message not received. Reason: %s', ex)
+            except ConnectionResetError:
+                _LOGGER.warning('Connection reset by peer')
+                await self._open_connection()
+            except BaseException as ex:
+                _LOGGER.warning('Unexpected Error: %s', ex)
 
         return resp
 
     async def _get_status_task(self):
         while True:
             _LOGGER.debug('Getting Status')
-            async with self._lock:
-                try:
-                    await self.get_status_cmd()
-                except Exception as ex:
-                    _LOGGER.error(f'Error during getting the status {ex}')
+            try:
+                await self.get_status_cmd()
+            except Exception as ex:
+                _LOGGER.error(f'Error during getting the status {ex}')
             await asyncio.sleep(self._get_status_period)
 
     async def get_status_cmd(self):
@@ -499,6 +506,7 @@ class CP():
         self._update_area_status(data[9])
         self._update_zone_status(data[3:5])
         self.update_zone_enabled(data[5:7])
+        self._update_time(data[10:12])
 
     def _update_zone_status(self, data: bytes):
         for i in range(self._number_of_zones):
@@ -539,6 +547,9 @@ class CP():
             if zone.enabled != status:
                 zone.enabled = status
 
+                for listener in self._control_panel_listeners:
+                    asyncio.create_task(listener(id, zone))
+
                 _LOGGER.info(
                     'Zone enabling of Zone %d changed to %d',
                     zone_number,
@@ -553,9 +564,7 @@ class CP():
             self._control_panel.siren.on = status
 
             for listener in self._control_panel_listeners:
-                asyncio.create_task(
-                    listener(0, self._control_panel.siren)
-                )
+                asyncio.create_task(listener(0, self._control_panel.siren))
 
             _LOGGER.info('Siren changed to %d', self._control_panel.siren)
 
@@ -569,6 +578,10 @@ class CP():
 
             if out.on != status:
                 out.on = status
+
+                for listener in self._control_panel_listeners:
+                    asyncio.create_task(listener(id, out))
+
                 _LOGGER.info('The output %d changed to %d', id, out.on)
 
     def _update_area_status(self, data: int):
@@ -608,6 +621,23 @@ class CP():
                     'Status of Area %d changed to %s',
                     area_number,
                     area.mode)
+
+    def _update_time(self, data: bytes):
+
+        # Hours
+        hours = data[0] & 0x1F  # Only the first 5 bits matters (0h-23h)
+        # Minutes
+        minutes = data[1] & 0x3F  # Only the first 6 bits matters (0m-59m)
+        # Time
+        time: Time = Time(hour=hours, minute=minutes)
+
+        if self._control_panel.time_utc != time:
+            self._control_panel.time_utc = time
+
+            for listener in self._control_panel_listeners:
+                asyncio.create_task(listener(0, self._control_panel.time_utc))
+
+            _LOGGER.info('Time updated %d', self._control_panel.time_utc)
 
     async def _get_crc(self, data: bytes):
 

@@ -1,3 +1,4 @@
+import datetime
 from dataclasses import dataclass
 from enum import Enum
 from typing import Callable
@@ -53,6 +54,10 @@ class Area(ControlPanelModel):
     mode: ArmingMode = ArmingMode.DISARMED
 
 
+class Time(datetime.time):
+    pass
+
+
 @dataclass
 class ControlPanel(ControlPanelModel):
     """Dataclass representing the control panel object
@@ -61,6 +66,7 @@ class ControlPanel(ControlPanelModel):
     areas: Dict[Id, Area]
     zones: Dict[Id, Zone]
     outputs: Dict[Id, Output]
+    time_utc: Time
 
 
 ControlPanelListener = Callable[[Id, ControlPanelModel], bool]
