@@ -208,6 +208,117 @@ class CP():
         if update:
             await self.get_status_cmd()
 
+    async def set_output(self, id: Id, on: bool, update: bool = False):
+        try:
+            if id not in self.control_panel.outputs:
+                raise ValueError(f"The output with {id} doesn't exist")
+
+            if self._control_panel.outputs[id].on != on:
+                await self._send_command(self._get_output_bytes(id, on))
+                if update:
+                    await self.get_status_cmd()
+        except Exception as ex:
+            _LOGGER.error(f'Error setting the output: {ex}')
+
+    async def set_arming(
+        self,
+        id: Id = 1,
+        arm: bool = False,
+        update: bool = False
+    ):
+        if arm and self._control_panel.areas[id].mode == ArmingMode.DISARMED:
+            # Arm
+            await self._send_command(
+                bytes([
+                    0x0e, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x17
+                ])
+            )
+            if update:
+                await self.get_status_cmd()
+        elif not arm and \
+                self._control_panel.areas[id].mode != ArmingMode.DISARMED:
+            # Disarm
+            await self._send_command(
+                bytes([
+                    0x0e, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x18
+                ])
+            )
+            if update:
+                await self.get_status_cmd()
+
+    async def set_siren(self, on: bool = False, update: bool = False):
+        if on and self._control_panel.siren.on != on:
+            # Switch on the siren
+            await self._send_command(
+                bytes([
+                    0x0e, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x1C
+                ])
+            )
+            if update:
+                await self.get_status_cmd()
+        elif not on and self._control_panel.siren.on != on:
+            # Switch of the siren
+            await self._send_command(
+                bytes([
+                    0x0e, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x1D
+                ])
+            )
+            if update:
+                await self.get_status_cmd()
+
+    @property
+    def control_panel(self) -> ControlPanel:
+        """Property that returns the control panel object
+        """
+
+        return self._control_panel
+
+    async def _open_connection(self):
+        """Opens the stream connection to the alarm
+        """
+
+        if self._writer:
+            self._writer.close()
+
+        self._reader, self._writer = await asyncio.open_connection(
+            self._ip,
+            self._port
+        )
+
+    def _create_siren(self) -> Siren:
+        """Create and initialize the siren object
+        """
+
+        return Siren()
+
+    def _create_areas(self) -> Dict[Id, Area]:
+        """Create and initialize all the area objects
+        """
+
+        return {i + 1: Area() for i in range(self._number_of_areas)}
+
+    def _create_zones(self) -> Dict[Id, Zone]:
+        """Create and initialize all the zone objects
+        """
+
+        return {i + 1: Zone() for i in range(self._number_of_zones)}
+
+    def _create_outputs(self) -> Dict[Id, Output]:
+        """Create and initialize all the output objects
+        """
+
+        return {i + 1: Output() for i in range(self._number_of_outputs)}
+
+    def _create_time(self) -> Time:
+        """Create and initialize the siren object
+        """
+
+        return Time()
+
     @classmethod
     def _supports_set_output(cls, id: Id):
         if 0 < id <= 4:
@@ -267,102 +378,6 @@ class CP():
             raise ValueError(f'The output with the id {id} is not supported')
 
         return ret
-
-    async def set_output(self, id: Id, on: bool):
-        try:
-            if id not in self.control_panel.outputs:
-                raise ValueError(f"The output with {id} doesn't exist")
-
-            if self._control_panel.outputs[id].on != on:
-                await self._send_command(self._get_output_bytes(id, on))
-        except Exception as ex:
-            _LOGGER.error(f'Error setting the output: {ex}')
-
-    async def set_arming(self, id: Id = 1, arm: bool = False):
-        if arm and self._control_panel.areas[id].mode == ArmingMode.DISARMED:
-            # Arm
-            await self._send_command(
-                bytes([
-                    0x0e, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x17
-                ])
-            )
-        elif not arm and \
-                self._control_panel.areas[id].mode != ArmingMode.DISARMED:
-            # Disarm
-            await self._send_command(
-                bytes([
-                    0x0e, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x18
-                ])
-            )
-
-    async def set_siren(self, on: bool = False):
-        if on and self._control_panel.siren.on != on:
-            # Switch on the siren
-            await self._send_command(
-                bytes([
-                    0x0e, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x1C
-                ])
-            )
-        elif not on and self._control_panel.siren.on != on:
-            # Switch of the siren
-            await self._send_command(
-                bytes([
-                    0x0e, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x1D
-                ])
-            )
-
-    @property
-    def control_panel(self) -> ControlPanel:
-        """Property that returns the control panel object
-        """
-
-        return self._control_panel
-
-    async def _open_connection(self):
-        """Opens the stream connection to the alarm
-        """
-
-        if self._writer:
-            self._writer.close()
-
-        self._reader, self._writer = await asyncio.open_connection(
-            self._ip,
-            self._port
-        )
-
-    def _create_siren(self) -> Siren:
-        """Create and initialize the siren object
-        """
-
-        return Siren()
-
-    def _create_areas(self) -> Dict[Id, Area]:
-        """Create and initialize all the area objects
-        """
-
-        return {i + 1: Area() for i in range(self._number_of_areas)}
-
-    def _create_zones(self) -> Dict[Id, Zone]:
-        """Create and initialize all the zone objects
-        """
-
-        return {i + 1: Zone() for i in range(self._number_of_zones)}
-
-    def _create_outputs(self) -> Dict[Id, Output]:
-        """Create and initialize all the output objects
-        """
-
-        return {i + 1: Output() for i in range(self._number_of_outputs)}
-
-    def _create_time(self) -> Time:
-        """Create and initialize the siren object
-        """
-
-        return Time()
 
     @staticmethod
     def _retry_policy(info: RetryInfo) -> Tuple[bool, int]:
