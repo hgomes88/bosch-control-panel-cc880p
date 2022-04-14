@@ -637,7 +637,7 @@ class CP():
             for listener in self._control_panel_listeners:
                 asyncio.create_task(listener(0, self._control_panel.time_utc))
 
-            _LOGGER.info('Time updated %d', self._control_panel.time_utc)
+            _LOGGER.info('Time updated %s', self._control_panel.time_utc)
 
     async def _get_crc(self, data: bytes):
 
