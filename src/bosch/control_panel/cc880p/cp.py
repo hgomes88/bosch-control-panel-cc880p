@@ -566,7 +566,7 @@ class CP():
             for listener in self._control_panel_listeners:
                 asyncio.create_task(listener(0, self._control_panel.siren))
 
-            _LOGGER.info('Siren changed to %d', self._control_panel.siren)
+            _LOGGER.info('Siren changed to %d', self._control_panel.siren.on)
 
     def _update_output_status(self, data: bytes):
         for i in range(self._number_of_outputs):
