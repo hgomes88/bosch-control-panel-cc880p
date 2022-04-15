@@ -6,6 +6,7 @@ from bosch.control_panel.cc880p.cli.parser import Args
 from bosch.control_panel.cc880p.cli.parser import get_args
 from bosch.control_panel.cc880p.cp import CP
 from bosch.control_panel.cc880p.models import Area
+from bosch.control_panel.cc880p.models import Availability
 from bosch.control_panel.cc880p.models import ControlPanelModel
 from bosch.control_panel.cc880p.models import Id
 from bosch.control_panel.cc880p.models import Output
@@ -40,6 +41,8 @@ async def cp_listener(id: Id, cp: ControlPanelModel) -> bool:
         print(f'Siren updated: {cp}')
     elif isinstance(cp, Area):
         print(f'Area {id} updated: {cp}')
+    elif isinstance(cp, Availability):
+        print(f'Control Panel availability is: {cp}')
 
     return True
 

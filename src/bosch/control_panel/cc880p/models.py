@@ -37,6 +37,14 @@ class Output(ControlPanelModel):
     on: bool = False
 
 
+@dataclass
+class Availability(ControlPanelModel):
+    """Dataclass to store the varios alarm output states
+    """
+
+    available: bool = False
+
+
 class ArmingMode(Enum):
     """Enumerator with all the alarm states
     """
@@ -67,6 +75,7 @@ class ControlPanel(ControlPanelModel):
     zones: Dict[Id, Zone]
     outputs: Dict[Id, Output]
     time_utc: Time
+    availability: Availability
 
 
 ControlPanelListener = Callable[[Id, ControlPanelModel], bool]

@@ -13,6 +13,7 @@ from aioretry import retry
 from aioretry import RetryInfo
 from bosch.control_panel.cc880p.models import Area
 from bosch.control_panel.cc880p.models import ArmingMode
+from bosch.control_panel.cc880p.models import Availability
 from bosch.control_panel.cc880p.models import ControlPanel
 from bosch.control_panel.cc880p.models import ControlPanelListener
 from bosch.control_panel.cc880p.models import DataListener
@@ -107,6 +108,8 @@ class CP():
             zones=self._create_zones(),
             # Create and initialize the time
             time_utc=self._create_time(),
+            # Create and initialize thr availability
+            availability=self._create_availability()
         )
 
     def __repr__(self):
@@ -314,10 +317,16 @@ class CP():
         return {i + 1: Output() for i in range(self._number_of_outputs)}
 
     def _create_time(self) -> Time:
-        """Create and initialize the siren object
+        """Create and initialize the time object
         """
 
         return Time()
+
+    def _create_availability(self) -> Time:
+        """Create and initialize the availability object
+        """
+
+        return Availability()
 
     @classmethod
     def _supports_set_output(cls, id: Id):
@@ -455,10 +464,12 @@ class CP():
         """
 
         resp = None
+        available = False
 
         async with self._lock:
             try:
                 resp = await self._send(message)
+                available = True
             except asyncio.exceptions.TimeoutError:
                 _LOGGER.warning('Message not received on time')
             except asyncio.IncompleteReadError as ex:
@@ -468,6 +479,13 @@ class CP():
                 await self._open_connection()
             except BaseException as ex:
                 _LOGGER.warning('Unexpected Error: %s', ex)
+            finally:
+                if available != self.control_panel.availability.available:
+                    self.control_panel.availability.available = available
+                    for listener in self._control_panel_listeners:
+                        asyncio.create_task(
+                            listener(0, self.control_panel.availability)
+                        )
 
         return resp
 
