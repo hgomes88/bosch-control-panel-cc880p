@@ -6,11 +6,8 @@ from enum import Enum
 from typing import Dict
 from typing import List
 from typing import Optional
-from typing import Tuple
 from typing import Union
 
-from aioretry import retry
-from aioretry import RetryInfo
 from bosch.control_panel.cc880p.models import Area
 from bosch.control_panel.cc880p.models import ArmingMode
 from bosch.control_panel.cc880p.models import Availability
@@ -284,13 +281,27 @@ class CP():
         """Opens the stream connection to the alarm
         """
 
-        if self._writer:
-            self._writer.close()
+        _LOGGER.info('Connecting to control panel...')
+        try:
+            if self._reader:
+                if not self._reader.at_eof():
+                    self._reader.feed_eof()
 
-        self._reader, self._writer = await asyncio.open_connection(
-            self._ip,
-            self._port
-        )
+            if self._writer:
+                self._writer.close()
+                await self._writer.wait_closed()
+
+            self._reader, self._writer = await asyncio.open_connection(
+                self._ip,
+                self._port
+            )
+        except ConnectionRefusedError:
+            _LOGGER.error('Connection to control panel failed')
+        except asyncio.TimeoutError:
+            _LOGGER.error('Connection to control panel timed out')
+        except BaseException:
+            _LOGGER.error(
+                'Connection to control panel failed with unknown error')
 
     def _create_siren(self) -> Siren:
         """Create and initialize the siren object
@@ -388,45 +399,6 @@ class CP():
 
         return ret
 
-    @staticmethod
-    def _retry_policy(info: RetryInfo) -> Tuple[bool, int]:
-        """Retry policy called whenever there's a failure on communication with
-        the control panel
-
-        Args:
-            info (RetryInfo):
-                The object needed for the retry policy
-
-        Returns:
-            Tuple[bool, int]:
-                Tuple with the boolean indicating whether the retry should be
-                forgiven, and the timeout for the next retry otherwise
-        """
-
-        if (
-            isinstance(
-                info.exception,
-                (asyncio.exceptions.TimeoutError, ConnectionResetError)
-            )
-            and info.fails <= 2
-        ):
-            # Do not forgive, retry in 2 seconds
-            return False, 2
-        # Forgive
-        return True, 0
-
-    async def _before_retry(self, info: RetryInfo):
-        """Callback called before every retry
-
-        Args:
-            info (RetryInfo): The object needed for the retry policy
-        """
-
-        # Reconnect
-        if info.fails >= 2:
-            await self._open_connection()
-
-    @retry(retry_policy='_retry_policy', before_retry='_before_retry')
     async def _send(self, message: bytes) -> bytes:
         """Sends a binary stream to the control panel and waits for its response
 
@@ -438,7 +410,7 @@ class CP():
         """
 
         if self._reader and self._writer:
-            # # Ensure a clean buffer
+            # Ensure a clean buffer
             self._reader._buffer.clear()  # type: ignore
 
             # Send the command
@@ -446,7 +418,13 @@ class CP():
             await self._writer.drain()
 
             # Wait for a response
-            return await asyncio.wait_for(self._reader.read(32), timeout=3)
+            if not self._reader.at_eof():
+                data = await asyncio.wait_for(self._reader.read(32), timeout=3)
+                if not data:
+                    raise asyncio.IncompleteReadError(data, 32)
+                return data
+            else:
+                raise EOFError()
         else:
             raise RuntimeError('Stream not initialized')
 
@@ -469,25 +447,29 @@ class CP():
         async with self._lock:
             try:
                 resp = await self._send(message)
-                available = True
             except asyncio.exceptions.TimeoutError:
                 _LOGGER.warning('Message not received on time')
-            except asyncio.IncompleteReadError as ex:
-                _LOGGER.warning('Message not received. Reason: %s', ex)
+            except asyncio.IncompleteReadError:
+                _LOGGER.warning('Message not received.')
             except ConnectionResetError:
                 _LOGGER.warning('Connection reset by peer')
-                await self._open_connection()
+            except EOFError:
+                _LOGGER.warning('Connection EOF')
             except BaseException as ex:
                 _LOGGER.warning('Unexpected Error: %s', ex)
+            else:
+                available = True
+                return resp
             finally:
-                if available != self.control_panel.availability.available:
-                    self.control_panel.availability.available = available
-                    for listener in self._control_panel_listeners:
-                        asyncio.create_task(
-                            listener(0, self.control_panel.availability)
-                        )
+                self.control_panel.availability.available = available
+                for listener in self._control_panel_listeners:
+                    asyncio.create_task(
+                        listener(0, self.control_panel.availability)
+                    )
 
-        return resp
+            # Reconnect
+            await self._open_connection()
+            return None
 
     async def _get_status_task(self):
         while True:
