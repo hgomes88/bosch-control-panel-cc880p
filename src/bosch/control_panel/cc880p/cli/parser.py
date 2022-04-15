@@ -31,6 +31,11 @@ def get_parser():
 
     parser = ArgumentParser(description='Connects to the Control Panel')
     parser.add_argument(
+        'cmd',
+        action='store_const',
+        const=None
+    )
+    parser.add_argument(
         '-v', '--version',
         action='version',
         version=version,
@@ -62,11 +67,6 @@ def get_cmds_parser(subparsers):
 
     # Command Parser
     cmds_parser = subparsers.add_parser('cmd', help='Execute a command')
-    cmds_parser.add_argument(
-        'cmd',
-        action='store_const',
-        const=None
-    )
 
     subparsers = cmds_parser.add_subparsers()
 
