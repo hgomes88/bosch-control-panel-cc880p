@@ -1,7 +1,8 @@
-def get_check_bits(*bytes_mask: int):
-    """Gets test data returning true if the mask matches
-    """
+"""Utils."""
 
+
+def get_check_bits(*bytes_mask: int):
+    """Get test data returning true if the mask matches."""
     n_bytes = len(bytes_mask)
     for byte in range(n_bytes):
         for bit in range(8):

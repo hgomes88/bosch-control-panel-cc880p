@@ -1,87 +1,154 @@
 import pytest
 from bosch.control_panel.cc880p.cp import CP
-from bosch.control_panel.cc880p.models import ArmingMode
-
-from tests.utils import get_check_bits
 
 
 def _zone_triggered_update_data():
-    # Maximum 16 zones
-    for i in range(16):
-        # Two bytes used for the zones
-        bytes = [0x00, 0x00]
-        # Bits from 0-7
-        bit = i % 8
-        # Bytes:
-        # 1st byte - zones 1-8
-        # 2nd byte - zones 9-16
-        byte = int(i / 8)
+    return [
+        (
+            '043460000000000000000e2cda',
+            [
+                False, False, False, False, False, False, False, False,
+                False, False, False, False, False, False, False, False
+            ]
+        ),
+        (
 
-        # Set the bit of the output to enable it
-        bytes[byte] = 1 << bit
-        # Retreive the tuples with the data to test, and the expected status
-        for data in get_check_bits(*bytes):
-            yield (i + 1, ) + data
+            '043460010000000000000e36e5',
+            [
+                True, False, False, False, False, False, False, False,
+                False, False, False, False, False, False, False, False
+            ]
+        ),
+        (
+            '043460020000000000000e36e6',
+            [
+                False, True, False, False, False, False, False, False,
+                False, False, False, False, False, False, False, False
+            ]
+        ),
+        (
+            '043460040000000000000e36e8',
+            [
+                False, False, True, False, False, False, False, False,
+                False, False, False, False, False, False, False, False
+            ]
+        ),
+        (
+            '043460080000000000000e36ec',
+            [
+                False, False, False, True, False, False, False, False,
+                False, False, False, False, False, False, False, False
+            ]
+        ),
+        (
+            '043460100000000000000e36f4',
+            [
+                False, False, False, False, True, False, False, False,
+                False, False, False, False, False, False, False, False
+            ]
+        ),
+        (
+            '043460200000000000000e3604',
+            [
+                False, False, False, False, False, True, False, False,
+                False, False, False, False, False, False, False, False
+            ]
+        ),
+        (
+            '043460400000000000000e3624',
+            [
+                False, False, False, False, False, False, True, False,
+                False, False, False, False, False, False, False, False
+            ]
+        ),
+        (
+            '043460800000000000000e3664',
+            [
+                False, False, False, False, False, False, False, True,
+                False, False, False, False, False, False, False, False
+            ]
+        ),
+        (
+            '043460000100000000000e2cda',
+            [
+                False, False, False, False, False, False, False, False,
+                True, False, False, False, False, False, False, False
+            ]
+        ),
+        (
+            '043460000200000000000e2cdb',
+            [
+                False, False, False, False, False, False, False, False,
+                False, True, False, False, False, False, False, False
+            ]
+        ),
+        (
+            '043460000400000000000e2cdd',
+            [
+                False, False, False, False, False, False, False, False,
+                False, False, True, False, False, False, False, False
+            ]
+        ),
+        (
+            '043460000800000000000e2ce1',
+            [
+                False, False, False, False, False, False, False, False,
+                False, False, False, True, False, False, False, False
+            ]
+        ),
+        (
+            '043460001000000000000e2ce9',
+            [
+                False, False, False, False, False, False, False, False,
+                False, False, False, False, True, False, False, False
+            ]
+        ),
+        (
+            '043460002000000000000e2cf9',
+            [
+                False, False, False, False, False, False, False, False,
+                False, False, False, False, False, True, False, False
+            ]
+        ),
+        (
+            '043460004000000000000e2c19',
+            [
+                False, False, False, False, False, False, False, False,
+                False, False, False, False, False, False, True, False
+            ]
+        ),
+        (
+            '043460008000000000000e2c59',
+            [
+                False, False, False, False, False, False, False, False,
+                False, False, False, False, False, False, False, True
+            ]
+        ),
+        (
+            '043460a55a00000000000e2cd9',
+            [
+                True, False, True, False, False, True, False, True,
+                False, True, False, True, True, False, True, False
+            ]
+        ),
+    ]
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
-    'zone_number, data, zone_status',
+    'data, zones_status',
     _zone_triggered_update_data()
 )
-def test_zone_triggered_update(
-    data: bytes,
-    zone_number: int,
-    zone_status: bool,
-    control_panel: CP
+async def test_zone_triggered_update(
+    data: str,
+    zones_status: bool,
+    control_panel: CP,
+    reader
 ):
-    control_panel._update_zone_status(data)
-    assert control_panel.control_panel.zones[
-        zone_number
-    ].triggered is zone_status
 
+    reader.return_value.readexactly.return_value = bytes.fromhex(data)
+    await control_panel.get_status()
 
-def _zone_enabled_update_data():
+    cp_zones = control_panel.control_panel.zones.values()
 
-    for area_mode in [e for e in ArmingMode]:
-        # Maximum 16 zones
-        for i in range(1):
-            # Two bytes used for the zones
-            bytes = [0x00, 0x00]
-            # Bits from 0-7
-            bit = i % 8
-            # Bytes:
-            # 1st byte - zones 1-8
-            # 2nd byte - zones 9-16
-            byte = int(i / 8)
-
-            # Retreive the tuples with the data to test, and the expected
-            # status
-            bytes[byte] = 1 << bit
-
-            for data in get_check_bits(*bytes):
-                if area_mode == ArmingMode.ARMED_AWAY:
-                    data = (data[0], True)
-                if area_mode == ArmingMode.DISARMED:
-                    data = (data[0], False)
-
-                yield (i + 1, ) + data + (area_mode,)
-
-
-@pytest.mark.parametrize(
-    'zone_number, data, zone_status, area_mode',
-    _zone_enabled_update_data()
-)
-def test_zone_enabled_update(
-    data: bytes,
-    zone_number: int,
-    zone_status: bool,
-    area_mode: ArmingMode,
-    control_panel: CP
-):
-    # Set the proper area mode
-    control_panel.control_panel.areas[1].mode = area_mode
-    control_panel.update_zone_enabled(data)
-
-    assert control_panel.control_panel.zones[
-        zone_number
-    ].enabled is zone_status
+    assert [zone_status.triggered for zone_status in cp_zones] == zones_status

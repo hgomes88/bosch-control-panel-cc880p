@@ -1,3 +1,4 @@
+"""Control panel command line parser."""
 from argparse import ArgumentParser
 from enum import Enum
 from typing import List
@@ -8,13 +9,18 @@ from distutils.util import strtobool
 
 
 class Commands(Enum):
+    """Supported Commands."""
+
     SetSiren = 0
     SetMode = 1
     SetOutput = 2
     SendKeys = 3
+    SendRaw = 4
 
 
 class Args:
+    """Parser arguments."""
+
     connect: str
     port: int
     cmd: Optional[Commands]
@@ -28,7 +34,7 @@ args = Args()
 
 
 def get_parser():
-
+    """Get the argument parser."""
     parser = ArgumentParser(description='Connects to the Control Panel')
     parser.add_argument(
         'cmd',
@@ -56,6 +62,14 @@ def get_parser():
         help='the host port'
     )
 
+    parser.add_argument(
+        '-i', '--code',
+        required=False,
+        metavar='INSTALLER_CODE',
+        type=str,
+        help='the installer code'
+    )
+
     subparsers = parser.add_subparsers()
 
     get_cmds_parser(subparsers)
@@ -64,19 +78,21 @@ def get_parser():
 
 
 def get_cmds_parser(subparsers):
-
+    """Get commands parser."""
     # Command Parser
     cmds_parser = subparsers.add_parser('cmd', help='Execute a command')
 
     subparsers = cmds_parser.add_subparsers()
 
     get_cmd_send_keys_parser(subparsers)
+    get_cmd_send_raw_parser(subparsers)
     get_cmd_set_mode_parser(subparsers)
     get_cmd_set_siren_parser(subparsers)
     get_cmd_set_output_parser(subparsers)
 
 
 def get_cmd_send_keys_parser(subparsers):
+    """Send keys command parser."""
     # SEND KEYS command
     cmd_send_keys_parser = subparsers.add_parser(
         'sendKeys',
@@ -96,7 +112,31 @@ def get_cmd_send_keys_parser(subparsers):
     )
 
 
+def get_cmd_send_raw_parser(subparsers):
+    """Send raw command parser."""
+    # SEND Raw command
+    cmd_send_raw_parser = subparsers.add_parser(
+        'sendRaw',
+        help='Sends a set of bytes to the control panel.'
+    )
+    cmd_send_raw_parser.add_argument(
+        'cmd',
+        action='store_const',
+        const=Commands.SendRaw
+    )
+
+    def string_to_bytes(string: str) -> bytes:
+        return bytes.fromhex(string)
+
+    cmd_send_raw_parser.add_argument(
+        'raw',
+        type=lambda string: bytes.fromhex(string),
+        help='The byte to send'
+    )
+
+
 def get_cmd_set_mode_parser(subparsers):
+    """Set mode command parser."""
     # SET MODE command
     cmd_set_mode_parser = subparsers.add_parser(
         'setMode',
@@ -115,6 +155,7 @@ def get_cmd_set_mode_parser(subparsers):
 
 
 def get_cmd_set_siren_parser(subparsers):
+    """Set siren command parser."""
     cmd_set_siren_parser = subparsers.add_parser(
         'setSiren',
         help='Change the control panel siren status'
@@ -132,6 +173,7 @@ def get_cmd_set_siren_parser(subparsers):
 
 
 def get_cmd_set_output_parser(subparsers):
+    """Set output parser."""
     # SET OUTPUT command
     cmd_set_out_parser = subparsers.add_parser(
         'setOut',
@@ -155,4 +197,5 @@ def get_cmd_set_output_parser(subparsers):
 
 
 def get_args():
+    """Parse and get the arguments."""
     return get_parser().parse_args(namespace=args)

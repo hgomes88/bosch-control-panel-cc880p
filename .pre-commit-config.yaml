@@ -56,3 +56,9 @@ repos:
   rev: v0.931
   hooks:
   - id: mypy
+
+- repo: https://github.com/PyCQA/pydocstyle
+  rev: 6.3.0
+  hooks:
+  - id: pydocstyle
+    exclude: __init__.py
