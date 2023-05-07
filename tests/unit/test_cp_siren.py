@@ -1,18 +1,21 @@
 import pytest
 from bosch.control_panel.cc880p.cp import CP
 
-from tests.utils import get_check_bits
 
-
-def _siren_status_update_data():
-    yield from get_check_bits(0x40)
-
-
-@pytest.mark.parametrize('data, siren_status', _siren_status_update_data())
-def test_siren_status_update(
-    data: bytes,
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    'data, siren_status',
+    [
+        ('043460000000000000004d2110', True),
+        ('043460000000000000000d27d5', False),
+    ]
+)
+async def test_siren_status_update(
+    data: str,
     siren_status: bool,
-    control_panel: CP
+    control_panel: CP,
+    reader
 ):
-    control_panel._update_siren_status(data[0])
+    reader.return_value.readexactly.return_value = bytes.fromhex(data)
+    await control_panel.get_status()
     assert control_panel.control_panel.siren.on is siren_status

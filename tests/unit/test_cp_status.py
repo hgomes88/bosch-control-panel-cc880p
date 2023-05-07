@@ -8,7 +8,7 @@ def test_is_status_msg(
     # When is a status message
     assert control_panel._is_status_msg(bytes([0x04] + [0] * 12)) is True
 
-    # When is not a status messate
+    # When is not a status message
     assert control_panel._is_status_msg(bytes([0x03] + [0] * 10)) is False
 
     # When is a status message but wrong size

@@ -1,5 +1,5 @@
 from bosch.control_panel.cc880p.cp import CP
-from bosch.control_panel.cc880p.models import ArmingMode
+from bosch.control_panel.cc880p.models.cp import ArmingMode
 
 
 def test_init_control_panel(
