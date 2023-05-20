@@ -1,0 +1,5 @@
+Request the control panel status information, where:
+
+01 00 00 00 <c2><c1> <c4><c3> <c6><c5> 0<c7> 00 00 f1
+
+<c1..c7> -> Are the installer code digits (if not used, the digit should be f)
