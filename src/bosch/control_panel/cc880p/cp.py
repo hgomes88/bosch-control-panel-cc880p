@@ -258,8 +258,8 @@ class CP:
                     _LOGGER.warning('Connection failed')
                     await self._close_connection()
                     raise
-                except BaseException as ex:
-                    _LOGGER.warning('Unexpected Error: %s', ex)
+                except BaseException:
+                    _LOGGER.exception('Unexpected Error:')
                     raise
                 else:
                     available = True
