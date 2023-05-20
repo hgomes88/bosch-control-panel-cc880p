@@ -131,7 +131,7 @@ class CP:
         if self._reconnection_task:
             self._reconnection_task.cancel()
             self._reconnection_task = None
-        with self._lock:
+        async with self._lock:
             await self._close_connection()
         return self
 
