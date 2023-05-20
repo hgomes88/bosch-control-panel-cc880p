@@ -13,6 +13,7 @@ from bosch.control_panel.cc880p.models.cp import CpVersion
 from bosch.control_panel.cc880p.models.cp import Id
 from bosch.control_panel.cc880p.models.cp import Output
 from bosch.control_panel.cc880p.models.cp import Siren
+from bosch.control_panel.cc880p.models.cp import Time
 from bosch.control_panel.cc880p.models.cp import Zone
 from bosch.control_panel.cc880p.utils import to_hex
 
@@ -47,6 +48,8 @@ async def cp_listener(id: Id, cp: ControlPanelEntity) -> bool:
         print(f'Area {id} updated: {cp}')
     elif isinstance(cp, Availability):
         print(f'Control Panel availability is: {cp}')
+    elif isinstance(cp, Time):
+        print(f'Control Panel time is: {cp}')
 
     return True
 

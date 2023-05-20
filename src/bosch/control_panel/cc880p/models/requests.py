@@ -1,6 +1,7 @@
 """Requests related data models."""
 from dataclasses import dataclass
 from dataclasses import field
+from datetime import datetime
 from enum import Enum
 
 from bosch.control_panel.cc880p.utils import checksum
@@ -20,6 +21,8 @@ class RequestsProps(Enum):
     SetArmingRequestSize = 11
     SetSirenRequestCode = '0E'
     SetSirenRequestSize = 11
+    SetTimeRequestCode = '0E'
+    SetTimeRequestSize = 11
 
 
 @dataclass
@@ -142,3 +145,35 @@ class SetSirenRequest(Request):
         empty8 = [0x00] * 8
         status = 0x05 if self.on else 0x06
         return self._encode(bytes([status, *empty8]))
+
+
+@dataclass
+class SetTimeRequest(Request):
+    """Set TIme Request."""
+
+    code: str = field(
+        init=False,
+        default=RequestsProps.SetSirenRequestCode.value)
+    size: int = field(
+        init=False,
+        default=RequestsProps.SetSirenRequestSize.value)
+    time: datetime
+
+    def encode(self):
+        """Encode the request to set the siren on/off."""
+        empty3 = [0x00] * 3
+        set_time = 0x0C
+
+        if self.time is None:
+            self.time = datetime.now()
+
+        year = int(self.time.strftime('%y'))
+        return self._encode(bytes([
+            set_time,
+            self.time.hour,
+            self.time.minute,
+            year,
+            self.time.month,
+            self.time.day,
+            *empty3
+        ]))

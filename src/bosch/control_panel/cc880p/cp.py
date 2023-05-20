@@ -1,6 +1,7 @@
 """Control Panel."""
 import asyncio
 import dataclasses
+import datetime
 import logging
 from asyncio import AbstractEventLoop
 from enum import Enum
@@ -16,12 +17,12 @@ from bosch.control_panel.cc880p.models.constants import MAX_KEYS
 from bosch.control_panel.cc880p.models.cp import ArmingMode
 from bosch.control_panel.cc880p.models.cp import ControlPanel
 from bosch.control_panel.cc880p.models.cp import CpModel
-from bosch.control_panel.cc880p.models.cp import Time
 from bosch.control_panel.cc880p.models.requests import KeysRequest
 from bosch.control_panel.cc880p.models.requests import Request
 from bosch.control_panel.cc880p.models.requests import SetArmingRequest
 from bosch.control_panel.cc880p.models.requests import SetOutRequest
 from bosch.control_panel.cc880p.models.requests import SetSirenRequest
+from bosch.control_panel.cc880p.models.requests import SetTimeRequest
 from bosch.control_panel.cc880p.models.requests import StatusRequest
 from bosch.control_panel.cc880p.models.responses import Response
 from bosch.control_panel.cc880p.models.responses import StatusResponse
@@ -177,6 +178,11 @@ class CP:
         elif not on and self._control_panel.siren.on != on:
             # Switch of the siren
             await self.send_request(SetSirenRequest(on), StatusResponse)
+
+    async def set_time(self, time: datetime.datetime = None):
+        """Set time."""
+        # Set the time in the alarm
+        await self.send_request(SetTimeRequest(time), StatusResponse)
 
     async def get_status(self):
         """Command to request the status of the alarm."""
@@ -473,13 +479,12 @@ class CP:
                     'Status of Area %d changed to %s', area_number, area.mode
                 )
 
-    def _update_time(self, time: Time):
-        if self._control_panel.time_utc != time:
-            self._control_panel.time_utc = Time(
-                hour=time.hour, minute=time.minute
-            )
+    def _update_time(self, time: datetime.time):
+
+        if self._control_panel.time.time != time:
+            self._control_panel.time.time = time
 
             for listener in self._control_panel_listeners:
-                asyncio.create_task(listener(0, self._control_panel.time_utc))
+                asyncio.create_task(listener(0, self._control_panel.time))
 
-            _LOGGER.info('Time updated %s', self._control_panel.time_utc)
+            _LOGGER.info('Time updated %s', self._control_panel.time)

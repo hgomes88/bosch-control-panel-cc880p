@@ -173,56 +173,51 @@ Byte    Identifier  Comments
 1       C0          Hexadecimal representation of the 'Send Key' command
 2-8     k<n>        Each byte is represents the key of the keypad. Can be sent
                         from 1 up to 7 keys in a single command
-                        Note: Because it was not possible to determine the
-                        checksum algorithm, the keys can only be sent one at a
-                        time. Below is the list of the frames corresponding to
-                        all the keys available:
-                            '0': 0C 00 00 00 00 00 00 00 00 01 16
-                            '1': 0C 01 00 00 00 00 00 00 00 01 16
-                            '2': 0C 02 00 00 00 00 00 00 00 01 17
-                            '3': 0C 03 00 00 00 00 00 00 00 01 19
-                            '4': 0C 04 00 00 00 00 00 00 00 01 19
-                            '5': 0C 05 00 00 00 00 00 00 00 01 1B
-                            '6': 0C 06 00 00 00 00 00 00 00 01 1C
-                            '7': 0C 07 00 00 00 00 00 00 00 01 1C
-                            '8': 0C 08 00 00 00 00 00 00 00 01 1D
-                            '9': 0C 09 00 00 00 00 00 00 00 01 1F
-                            '#': 0C 1A 00 00 00 00 00 00 00 01 2F
-                            '*': 0C 1B 00 00 00 00 00 00 00 01 31
 9       area        If the alarm is configured to have multiple areas, then
                         this byte identifies the target area that the key(s)
                         will be sent to. Otherwise set it to '00'.
 10      nKeys       Number of keys being sent in this command
-11      crc         Frame checksum
-                        Note: The checksum is not recognized so far, and thus
-                        it should be manually set
+11      crc         Frame checksum (excluding the 1st byte)
 ```
 
-###### Set Siren Command
+###### Set Siren Command (Special Command)
 
 Command used to enable/disable the siren
 
 ```
-'Set Siren On ' Command
-0E 05 00 00 00 00 00 00 00 00 1C
+'Set Siren' Command
 
-'Set Siren Off' Command
-0E 06 00 00 00 00 00 00 00 00 1D
+0E <on> 00 00 00 00 00 00 00 00 <crc>
 
+Byte    Identifier  Comments
+-------------------------------------------------------------------------------
+1       0E          Hexadecimal representation of the special commands
+2       on          Sets the siren on or off:
+                      - 0x05 if is to set siren on
+                      - 0x06 if is to set siren off
+3-10    XX          Not used and thus, set to 0.
+11      crc         Frame checksum (excluding the 1st byte)
 ```
 
-###### Set Arm Command
+###### Set Arm Command (Special Command)
 
 Command used to arm/disarm the alarm
 
 ```
-'Arm' Command
-0E 01 00 00 00 00 00 00 00 00 17
+'Arm/Disarm' Command
 
-'Disarm' Command
-0E 02 00 00 00 00 00 00 00 00 18
+0E <arm> 00 00 00 00 00 00 00 00 <crc>
 
+Byte    Identifier  Comments
+-------------------------------------------------------------------------------
+1       0E          Hexadecimal representation of the special commands
+2       on          Arm/Disarm the alarm:
+                      - 0x01 if is to arm the alarm
+                      - 0x02 if is to disarm the alarm
+3-10    XX          Not used and thus, set to 0.
+11      crc         Frame checksum (excluding the 1st byte)
 ```
+
 
 ###### Set Output Command
 
@@ -235,29 +230,15 @@ Command used to set (enable/disable) outputs of the control panel.
 
 Byte    Identifier  Comments
 -------------------------------------------------------------------------------
-1       0E          Hexadecimal representation of special functions
+1       0E          Hexadecimal representation of special commands
 2       on          Special function to be executed:
-                        Set Output On: Set this byte to 03
-                        Set Output Off: Set this byte to 04
+                        Set Output On: Set this byte to 0x03
+                        Set Output Off: Set this byte to 0x04
 3       out         This byte represents the index of the target output.
                       Supports setting the outputs 1-5, which values in this
                       byte are 0-4 respectively.
-                      Here is the list of commands for each single output:
-
-                            '1 On':   0E 03 00 00 00 00 00 00 00 00 1A
-                            '1 Off':  0E 04 00 00 00 00 00 00 00 00 1A
-                            '2 On':   0C 03 01 00 00 00 00 00 00 00 1A
-                            '2 Off':  0C 04 01 00 00 00 00 00 00 00 1A
-                            '3 On':   0C 03 02 00 00 00 00 00 00 00 1B
-                            '3 Off':  0C 04 02 00 00 00 00 00 00 00 1B
-                            '4 On':   0C 03 03 00 00 00 00 00 00 00 1D
-                            '4 Off':  0C 04 03 00 00 00 00 00 00 00 1D
-                            '5 On':   0C 03 04 00 00 00 00 00 00 00 1D
-                            '5 Off':  0C 04 04 00 00 00 00 00 00 00 1D
-4-10    XX          All those bytes should be settled to 00.
-11      crc         Frame checksum
-                        Note: The checksum is not recognized so far, and thus
-                        it should be manually set
+4-10    XX          All those bytes should be set to 0.
+11      crc         Frame checksum (excluding the 1st byte)
 ```
 
 ###### Get Status Command
@@ -268,16 +249,17 @@ After sending this command is expected the control panel to answer with the [`Ge
 ```
 'Get Status' Command
 
-01 00 00 00 91 30 19 0F 00 00 F1
+01 00 00 00 <c2c1> <c4c3> <c6c5> <c7> 00 00 <crc>
 
 Byte   Identifier   Comments
 ----------------------------
 1       01          Hexadecimal representation of the 'Get Status' command.
-2-10    XX          The meaning of those bytes are unknown, and thus should be
-                        always sent shown above.
-11      F1          Frame Checksum. Since the checksum algorithm is unknown and
-                        this bytes of this command have always the same value,
-                        the checksum value should always be 'F1'
+2-4     XX          This bytes are not used and thus set to 0.
+5-8     c1..c7      Corresponds to the installer code needed to have permissions
+                      to get the alarm status. Each digit occupies a nibble.
+                      Not used digits should be set to 0xF.
+9..10   XX          This bytes are not used and thus set to 0.
+11      crc         Frame checksum (excluding the 1st byte)
 ```
 
 ###### Get Status Response

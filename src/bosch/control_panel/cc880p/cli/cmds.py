@@ -1,4 +1,5 @@
 """Command Line Commands Management."""
+from datetime import datetime
 from typing import Any
 from typing import List
 
@@ -49,6 +50,11 @@ async def handle_out_command(cp: CP, out: int, status: bool):
     )
 
 
+async def handle_time_command(cp: CP, time: datetime):
+    """Handle the set time command."""
+    await cmd(cp, cp.control_panel.time)(cp.set_time)(time=time)
+
+
 async def handle_keys_command(cp: CP, keys: List[str]):
     """Handle the keys sending."""
     keys = [i for ele in keys for i in ele]
@@ -90,6 +96,8 @@ async def handle_command(cp: CP, args: Args):
         await handle_mode_command(cp, args.mode)
     if args.cmd == Commands.SetSiren:
         await handle_siren_command(cp, args.status)
+    if args.cmd == Commands.SetTime:
+        await handle_time_command(cp, args.time)
     if args.cmd == Commands.SetOutput:
         await handle_out_command(cp, args.out, args.status)
     if args.cmd == Commands.SendKeys:
