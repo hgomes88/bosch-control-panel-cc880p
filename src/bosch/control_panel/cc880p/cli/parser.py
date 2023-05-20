@@ -1,5 +1,6 @@
 """Control panel command line parser."""
 from argparse import ArgumentParser
+from datetime import datetime
 from enum import Enum
 from typing import List
 from typing import Optional
@@ -14,8 +15,9 @@ class Commands(Enum):
     SetSiren = 0
     SetMode = 1
     SetOutput = 2
-    SendKeys = 3
-    SendRaw = 4
+    SetTime = 3
+    SendKeys = 4
+    SendRaw = 5
 
 
 class Args:
@@ -28,6 +30,7 @@ class Args:
     mode: str
     status: bool
     out: int
+    time: datetime
 
 
 args = Args()
@@ -89,6 +92,7 @@ def get_cmds_parser(subparsers):
     get_cmd_set_mode_parser(subparsers)
     get_cmd_set_siren_parser(subparsers)
     get_cmd_set_output_parser(subparsers)
+    get_cmd_set_time_parser(subparsers)
 
 
 def get_cmd_send_keys_parser(subparsers):
@@ -193,6 +197,31 @@ def get_cmd_set_output_parser(subparsers):
         'status',
         type=lambda x: bool(strtobool(x)),
         help='Changes the output'
+    )
+
+
+def get_cmd_set_time_parser(subparsers):
+    """Set output parser."""
+    # SET OUTPUT command
+    cmd_set_time_parser = subparsers.add_parser(
+        'setTime',
+        help='Set the time of the control panel'
+    )
+    cmd_set_time_parser.add_argument(
+        'cmd',
+        action='store_const',
+        const=Commands.SetTime
+    )
+    cmd_set_time_parser.add_argument(
+        '-t', '--time',
+        required=False,
+        metavar='TIME',
+        type=datetime.fromisoformat,
+        help=(
+            'Datetime to be set on the control panel. It should be in iso '
+            'format (e.g.: "2023-12-31 23:59:59"). If not used, the current '
+            'time will be applied.'
+        )
     )
 
 

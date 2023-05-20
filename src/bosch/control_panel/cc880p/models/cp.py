@@ -83,8 +83,19 @@ class Area(ControlPanelEntity):
     mode: ArmingMode = ArmingMode.DISARMED
 
 
-class Time(datetime.time):
+@dataclass
+class Time(ControlPanelEntity):
     """Datetime."""
+
+    time: datetime.time = datetime.time(hour=0, minute=0)
+
+    def __str__(self) -> str:
+        """Convert the object hours and minutes into a string."""
+        return f'{self.time.hour}:{self.time.minute}'
+
+    def __repr__(self) -> str:
+        """Convert the Time object into its string representation."""
+        return f'Time(time={str(self)})'
 
 
 @dataclass
@@ -95,7 +106,7 @@ class ControlPanel(ControlPanelEntity):
     areas: Dict[Id, Area]
     zones: Dict[Id, Zone]
     outputs: Dict[Id, Output]
-    time_utc: Time
+    time: Time
     availability: Availability
 
     @staticmethod
@@ -106,6 +117,6 @@ class ControlPanel(ControlPanelEntity):
             outputs={i + 1: Output() for i in range(model.n_outputs)},
             areas={i + 1: Area() for i in range(model.n_areas)},
             zones={i + 1: Zone() for i in range(model.n_zones)},
-            time_utc=Time(),
+            time=Time(),
             availability=Availability()
         )
