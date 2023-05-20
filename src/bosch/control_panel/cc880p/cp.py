@@ -5,6 +5,7 @@ import datetime
 import logging
 from asyncio import AbstractEventLoop
 from asyncio import Task
+from asyncio.exceptions import CancelledError
 from enum import Enum
 from typing import List
 from typing import Optional
@@ -211,14 +212,14 @@ class CP:
             n_resp_bytes=n_resp_bytes,
             timeout=3
         )
-        if resp:
-            if resp_type:
-                if len(resp) != resp_type.size:
-                    raise ValueError(
-                        f'The size of the frame should be {resp_type.size}'
-                        f' but is {len(resp)}'
-                    )
-            self._handle_data(resp)
+        if resp_type:
+            size_resp = len(resp) if resp else 0
+            if size_resp != resp_type.size:
+                raise ValueError(
+                    f'The size of the frame should be {resp_type.size}'
+                    f' but is {size_resp}'
+                )
+        self._handle_data(resp)
 
     async def send_command(
         self,
@@ -533,6 +534,8 @@ class CP:
                 if not self.connected:
                     _LOGGER.info('Connecting')
                     await self._connect()
+            except CancelledError:
+                break
             except BaseException:
                 _LOGGER.error('Connection failed')
             finally:
