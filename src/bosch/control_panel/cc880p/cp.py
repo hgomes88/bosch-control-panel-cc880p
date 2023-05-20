@@ -4,6 +4,7 @@ import dataclasses
 import datetime
 import logging
 from asyncio import AbstractEventLoop
+from asyncio import Task
 from enum import Enum
 from typing import List
 from typing import Optional
@@ -73,6 +74,10 @@ class CP:
         self._reader: Optional[asyncio.StreamReader] = None
         # Streamwriter
         self._writer: Optional[asyncio.StreamWriter] = None
+        # Connected
+        self._connected: bool = False
+        # Reconnection task
+        self._reconnection_task: Optional[Task] = None
 
         # Lock
         self._lock = asyncio.Lock()
@@ -109,14 +114,25 @@ class CP:
         """Property that returns the control panel object."""
         return self._control_panel
 
+    @property
+    def connected(self) -> bool:
+        """Report whether the connection to the alarm is established."""
+        return self._connected
+
     async def start(self) -> 'CP':
         """Establish the connection to the control panel."""
         # Open the connection to the control panel
-        await self._open_connection()
+        await self._connect()
+        self._reconnection_task = asyncio.create_task(self._reconnection())
         return self
 
     async def stop(self) -> 'CP':
         """Stop the connection to the control panel."""
+        if self._reconnection_task:
+            self._reconnection_task.cancel()
+            self._reconnection_task = None
+        with self._lock:
+            await self._close_connection()
         return self
 
     def add_control_panel_listener(self, listener: ControlPanelListener):
@@ -235,15 +251,17 @@ class CP:
                 resp = await self._send(message, n_resp_bytes, timeout)
             except asyncio.exceptions.TimeoutError:
                 _LOGGER.warning('Message not received on time')
+                await self._close_connection()
                 raise
             except asyncio.IncompleteReadError:
                 _LOGGER.warning('Message not received.')
                 raise
-            except ConnectionResetError:
-                _LOGGER.warning('Connection reset by peer')
-                raise
             except EOFError:
                 _LOGGER.warning('Connection EOF')
+                raise
+            except (OSError):
+                _LOGGER.warning('Connection failed')
+                await self._close_connection()
                 raise
             except BaseException as ex:
                 _LOGGER.warning('Unexpected Error: %s', ex)
@@ -259,32 +277,44 @@ class CP:
                             listener(0, self.control_panel.availability)
                         )
 
+    async def _connect(self):
+        async with self._lock:
+            _LOGGER.info('Connecting to control panel...')
+            try:
+                await self._close_connection()
+                await self._open_connection()
+            except asyncio.TimeoutError:
+                _LOGGER.error('Connection to control panel timed out')
+                raise
+            except (OSError):
+                _LOGGER.error('Connection to control panel failed')
+                raise
+            except BaseException:
+                _LOGGER.error(
+                    'Connection to control panel failed with unknown error')
+                raise
+
+    async def _close_connection(self):
+        """Close the stream connection to the alarm."""
+        if self._reader:
+            if not self._reader.at_eof():
+                self._reader.feed_eof()
+        if self._writer:
+            self._writer.close()
+            await self._writer.wait_closed()
+
+        self._reader = None
+        self._writer = None
+
+        self._connected = False
+
     async def _open_connection(self):
         """Open the stream connection to the alarm."""
-        _LOGGER.info('Connecting to control panel...')
-        try:
-            if self._reader:
-                if not self._reader.at_eof():
-                    self._reader.feed_eof()
-
-            if self._writer:
-                self._writer.close()
-                await self._writer.wait_closed()
-
-            self._reader, self._writer = await asyncio.open_connection(
-                self._ip,
-                self._port
-            )
-        except ConnectionRefusedError:
-            _LOGGER.error('Connection to control panel failed')
-            raise
-        except asyncio.TimeoutError:
-            _LOGGER.error('Connection to control panel timed out')
-            raise
-        except BaseException:
-            _LOGGER.error(
-                'Connection to control panel failed with unknown error')
-            raise
+        self._reader, self._writer = await asyncio.open_connection(
+            self._ip,
+            self._port
+        )
+        self._connected = True
 
     async def _send(
         self,
@@ -300,7 +330,7 @@ class CP:
         Returns:
             bytes: Response of the message sent to the control panel
         """
-        if self._reader and self._writer:
+        if self.connected and self._writer and self._reader:
             # Ensure a clean buffer
             self._reader._buffer.clear()  # type: ignore
 
@@ -310,8 +340,6 @@ class CP:
 
             # Wait for a response
             if not self._reader.at_eof():
-                # data = await asyncio.wait_for(self._reader.read(32),
-                # timeout=2)
                 if n_resp_bytes:
                     data = await asyncio.wait_for(
                         self._reader.readexactly(n_resp_bytes),
@@ -327,7 +355,7 @@ class CP:
             else:
                 raise EOFError()
         else:
-            raise RuntimeError('Stream not initialized')
+            raise ConnectionError('Connection not established')
 
     def _encode_key(self, key: str) -> int:
         # Is a number between 0 and 9
@@ -488,3 +516,14 @@ class CP:
                 asyncio.create_task(listener(0, self._control_panel.time))
 
             _LOGGER.info('Time updated %s', self._control_panel.time)
+
+    async def _reconnection(self):
+        while True:
+            try:
+                if not self.connected:
+                    _LOGGER.info('Reconnecting')
+                    await self._connect()
+            except BaseException:
+                _LOGGER.error('Reconnection failed')
+            finally:
+                await asyncio.sleep(3)
