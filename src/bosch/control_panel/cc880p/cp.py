@@ -77,7 +77,7 @@ class CP:
         # Connected
         self._connected: bool = False
         # Reconnection task
-        self._reconnection_task: Optional[Task] = None
+        self._conn_task: Optional[Task] = None
 
         # Lock
         self._lock = asyncio.Lock()
@@ -121,18 +121,12 @@ class CP:
 
     async def start(self) -> 'CP':
         """Establish the connection to the control panel."""
-        # Open the connection to the control panel
-        await self._connect()
-        self._reconnection_task = asyncio.create_task(self._reconnection())
+        await self._start_connection_task()
         return self
 
     async def stop(self) -> 'CP':
         """Stop the connection to the control panel."""
-        if self._reconnection_task:
-            self._reconnection_task.cancel()
-            self._reconnection_task = None
-        async with self._lock:
-            await self._close_connection()
+        await self._stop_connection_task()
         return self
 
     def add_control_panel_listener(self, listener: ControlPanelListener):
@@ -246,36 +240,42 @@ class CP:
         resp = None
         available = False
 
-        async with self._lock:
-            try:
-                resp = await self._send(message, n_resp_bytes, timeout)
-            except asyncio.exceptions.TimeoutError:
-                _LOGGER.warning('Message not received on time')
-                await self._close_connection()
-                raise
-            except asyncio.IncompleteReadError:
-                _LOGGER.warning('Message not received.')
-                raise
-            except EOFError:
-                _LOGGER.warning('Connection EOF')
-                raise
-            except (OSError):
-                _LOGGER.warning('Connection failed')
-                await self._close_connection()
-                raise
-            except BaseException as ex:
-                _LOGGER.warning('Unexpected Error: %s', ex)
-                raise
-            else:
-                available = True
-                return resp
-            finally:
-                if self.control_panel.availability.available != available:
-                    self.control_panel.availability.available = available
-                    for listener in self._control_panel_listeners:
-                        asyncio.create_task(
-                            listener(0, self.control_panel.availability)
-                        )
+        if self.connected:
+            async with self._lock:
+                try:
+                    resp = await self._send(message, n_resp_bytes, timeout)
+                except asyncio.exceptions.TimeoutError:
+                    _LOGGER.warning('Message not received on time')
+                    raise
+                except asyncio.IncompleteReadError:
+                    _LOGGER.warning('Message not received.')
+                    raise
+                except EOFError:
+                    _LOGGER.warning('Connection EOF')
+                    raise
+                except (OSError):
+                    _LOGGER.warning('Connection failed')
+                    await self._close_connection()
+                    raise
+                except BaseException as ex:
+                    _LOGGER.warning('Unexpected Error: %s', ex)
+                    raise
+                else:
+                    available = True
+                    return resp
+                finally:
+                    await self._update_availability(available)
+        else:
+            await self._update_availability(available)
+            raise ConnectionError('Not Connected')
+
+    async def _update_availability(self, available: bool = True):
+        if self.control_panel.availability.available != available:
+            self.control_panel.availability.available = available
+            for listener in self._control_panel_listeners:
+                asyncio.create_task(
+                    listener(0, self.control_panel.availability)
+                )
 
     async def _connect(self):
         async with self._lock:
@@ -355,7 +355,7 @@ class CP:
             else:
                 raise EOFError()
         else:
-            raise ConnectionError('Connection not established')
+            raise ConnectionError('Not Connected')
 
     def _encode_key(self, key: str) -> int:
         # Is a number between 0 and 9
@@ -396,7 +396,7 @@ class CP:
             for listener in self._data_listeners:
                 asyncio.create_task(listener(data))
         else:
-            _LOGGER.warn('No Data Received!!!')
+            _LOGGER.warning('No Data Received!!!')
 
     @classmethod
     def _is_status_msg(cls, data: bytes):
@@ -517,13 +517,23 @@ class CP:
 
             _LOGGER.info('Time updated %s', self._control_panel.time)
 
-    async def _reconnection(self):
+    async def _start_connection_task(self):
+        self._conn_task = asyncio.create_task(self._connection_task())
+
+    async def _stop_connection_task(self):
+        if self._conn_task:
+            self._conn_task.cancel()
+            self._conn_task = None
+        async with self._lock:
+            await self._close_connection()
+
+    async def _connection_task(self):
         while True:
             try:
                 if not self.connected:
-                    _LOGGER.info('Reconnecting')
+                    _LOGGER.info('Connecting')
                     await self._connect()
             except BaseException:
-                _LOGGER.error('Reconnection failed')
+                _LOGGER.error('Connection failed')
             finally:
                 await asyncio.sleep(3)

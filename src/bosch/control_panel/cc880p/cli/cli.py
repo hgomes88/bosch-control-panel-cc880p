@@ -54,12 +54,18 @@ async def cp_listener(id: Id, cp: ControlPanelEntity) -> bool:
     return True
 
 
+async def _wait_for_connection(cp: CP):
+    while not cp.connected:
+        await asyncio.sleep(1.0)
+
+
 async def run_listen_mode(cp: CP):
     """Run the control panel in listen mode."""
     cp.add_data_listener(data_listener)
     cp.add_control_panel_listener(cp_listener)
     while True:
         try:
+            await asyncio.wait_for(_wait_for_connection(cp), timeout=3.0)
             await cp.get_status()
         except BaseException:
             logging.exception('Error:')
