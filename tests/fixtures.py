@@ -44,9 +44,12 @@ def connection(mocker, reader, writer):
 @pytest.fixture
 async def control_panel(connection) -> CP:
     """Control panel fixture."""
-    yield await CP(
+    cp = await CP(
         ip='127.0.0.1',
         port=8888,
         model=CpVersion.S16_V14.model(),
         installer_code='0000'
     ).start()
+
+    yield cp
+    await cp.stop()

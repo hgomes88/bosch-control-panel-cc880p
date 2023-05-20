@@ -59,8 +59,12 @@ async def run_listen_mode(cp: CP):
     cp.add_data_listener(data_listener)
     cp.add_control_panel_listener(cp_listener)
     while True:
-        await cp.get_status()
-        await asyncio.sleep(1)
+        try:
+            await cp.get_status()
+        except BaseException:
+            logging.exception('Error:')
+        finally:
+            await asyncio.sleep(1)
 
 
 async def run_cmd_mode(cp: CP, args):
