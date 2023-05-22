@@ -6,76 +6,78 @@ from bosch.control_panel.cc880p.cli.cmds import handle_command
 from bosch.control_panel.cc880p.cli.parser import Args
 from bosch.control_panel.cc880p.cli.parser import get_args
 from bosch.control_panel.cc880p.cp import CP
+from bosch.control_panel.cc880p.models.constants import Id
 from bosch.control_panel.cc880p.models.cp import Area
 from bosch.control_panel.cc880p.models.cp import Availability
-from bosch.control_panel.cc880p.models.cp import ControlPanelEntity
 from bosch.control_panel.cc880p.models.cp import CpVersion
-from bosch.control_panel.cc880p.models.cp import Id
 from bosch.control_panel.cc880p.models.cp import Output
 from bosch.control_panel.cc880p.models.cp import Siren
 from bosch.control_panel.cc880p.models.cp import Time
 from bosch.control_panel.cc880p.models.cp import Zone
+from bosch.control_panel.cc880p.models.errors import Error
+from bosch.control_panel.cc880p.models.listener import BaseControlPanelListener
 from bosch.control_panel.cc880p.utils import to_hex
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.DEBUG)
 
 prev_data = None
 
 
-async def data_listener(data: bytes) -> bool:
-    """Listen of any control panel change."""
-    global prev_data
-    if prev_data and prev_data[:-2] != data[:-2]:
-        print('\nDifference:')
-        print(f'\tBefore:\t{to_hex(prev_data)}')
-        print(f'\tAfter:\t{to_hex(data)}')
-    else:
-        print('\nNo Changes:')
-        print(to_hex(data))
-    prev_data = data
-    return True
+class Listener(BaseControlPanelListener):
+    """Lister class implementing all events of interest."""
 
+    def __init__(self, cp: CP):
+        """Init."""
+        self._cp = cp
 
-async def cp_listener(id: Id, cp: ControlPanelEntity) -> bool:
-    """Control panel listener."""
-    if isinstance(cp, Zone):
-        print(f'Zone {id} updated: {cp}')
-    elif isinstance(cp, Output):
-        print(f'Output {id} updated: {cp}')
-    elif isinstance(cp, Siren):
-        print(f'Siren updated: {cp}')
-    elif isinstance(cp, Area):
-        print(f'Area {id} updated: {cp}')
-    elif isinstance(cp, Availability):
-        print(f'Control Panel availability is: {cp}')
-    elif isinstance(cp, Time):
-        print(f'Control Panel time is: {cp}')
+    async def on_availability_changed(self, entity: Availability):
+        """On availability changed."""
+        print(f'Control Panel availability is: {entity}')
 
-    return True
+    async def on_area_changed(self, entity: Area):
+        """On area changed."""
+        print(f'Area {id} updated: {entity}')
 
+    async def on_siren_changed(self, entity: Siren):
+        """On siren changed."""
+        print(f'Siren updated: {entity}')
 
-async def _wait_for_connection(cp: CP):
-    while not cp.connected:
-        await asyncio.sleep(1.0)
+    async def on_zone_changed(self, id: Id, entity: Zone):
+        """On zone changed."""
+        print(f'Zone {id} updated: {entity}')
+
+    async def on_time_changed(self, entity: Time):
+        """On time changed."""
+        print('Time changed to:', entity)
+
+    async def on_output_changed(self, id: Id, entity: Output):
+        """On output changed."""
+        print(f'Output {id} updated: {entity}')
+
+    async def on_data(self, data: bytes):
+        """On data changed."""
+        global prev_data
+        if prev_data and prev_data[:-2] != data[:-2]:
+            print('\nDifference:')
+            print(f'\tBefore:\t{to_hex(prev_data)}')
+            print(f'\tAfter:\t{to_hex(data)}')
+        else:
+            print('\nNo Changes:')
+            print(to_hex(data))
+        prev_data = data
 
 
 async def run_listen_mode(cp: CP):
     """Run the control panel in listen mode."""
-    cp.add_data_listener(data_listener)
-    cp.add_control_panel_listener(cp_listener)
+    cp.add_listener(Listener(cp))
     while True:
-        try:
-            await asyncio.wait_for(_wait_for_connection(cp), timeout=3.0)
-            await cp.get_status()
-        except BaseException:
-            logging.exception('Error:')
-        finally:
-            await asyncio.sleep(1)
+        await asyncio.sleep(1)
 
 
 async def run_cmd_mode(cp: CP, args):
     """Run mode command."""
-    await handle_command(cp, args)
+    resp = await handle_command(cp, args)
+    print('Resp:', resp)
 
 
 async def run(loop):
@@ -87,13 +89,20 @@ async def run(loop):
         port=args.port,
         model=CpVersion.S16_V14.model(),
         installer_code=args.code,
+        poll_period=3,
         loop=loop,
     )
 
     await cp.start()
 
     if args.cmd:
-        await run_cmd_mode(cp, args)
+        try:
+            await run_cmd_mode(cp, args)
+        except Error as exc:
+            logging.error(f'Error: {repr(exc)}')
+        except BaseException:
+            logging.exception('Unknown error:')
+
     else:
         await run_listen_mode(cp)
 

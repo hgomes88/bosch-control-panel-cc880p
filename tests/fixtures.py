@@ -42,8 +42,11 @@ def connection(mocker, reader, writer):
 
 
 @pytest.fixture
-async def control_panel(connection) -> CP:
+async def control_panel(connection, reader) -> CP:
     """Control panel fixture."""
+    # Simulate status response
+    reader.return_value.readexactly.return_value = bytes([0x04] + [0] * 12)
+
     cp = await CP(
         ip='127.0.0.1',
         port=8888,
@@ -52,4 +55,5 @@ async def control_panel(connection) -> CP:
     ).start()
 
     yield cp
+
     await cp.stop()

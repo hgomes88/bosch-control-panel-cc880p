@@ -23,9 +23,14 @@ class Response:
     code: str
     size: int
 
+    @classmethod
+    def decode(cls, data: bytes, cp: CpModel):
+        """Abstract method to decode a response."""
+        raise NotImplementedError
+
 
 @dataclass
-class StatusResponse:
+class StatusResponse(Response):
     """Status response object."""
 
     code: str = field(init=False, default=ResponsesProps.StatusCode.value)
@@ -39,7 +44,7 @@ class StatusResponse:
 
     @classmethod
     def decode(cls, data: bytes, cp: CpModel):
-        """Decode a status response."""
+        """Implement of decode method."""
         time = cls._decode_time(data)
         siren = cls._decode_siren_status(data)
         outs = cls._decode_outputs(data, cp.n_outputs)
